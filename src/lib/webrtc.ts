@@ -112,8 +112,16 @@ function setupWs() {
   }
 }
 
+import { logs } from '../stores/logs'
+
 // debug helper
-function dbg() { try { console.debug('[webrtc]', ...arguments) } catch(e){} }
+function dbg(...args: any[]) {
+  try {
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+    logs.add(msg, 'debug', ...args)
+    console.debug('[webrtc]', ...args)
+  } catch(e){}
+}
 
 async function handleSignal(from: string, payload: any) {
   console.debug('[webrtc] handleSignal: from', from, payload && payload.type)
