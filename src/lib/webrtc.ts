@@ -36,16 +36,16 @@ function parsePacket(buf: ArrayBuffer) {
 // Signaling helpers
 async function connectSignalingByCandidateIp(ip: string) {
   const url = `ws://${ip}:3001`
-  console.debug('[webrtc] connectSignalingByCandidateIp: trying', url)
+  console.debug('[webrtc] connectSignalingByCandidateIp: trying', url, { time: Date.now() })
   try {
     const socket = new WebSocket(url)
     return await new Promise<WebSocket>((resolve, reject) => {
       const t = setTimeout(() => { reject(new Error('timeout')) }, 3000)
-      socket.onopen = () => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: connected', url); resolve(socket) }
-      socket.onerror = (e) => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: error', url, e); reject(e) }
-    })
+      socket.onopen = () => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: connected', url, { time: Date.now() }); resolve(socket) }
+      socket.onerror = (e) => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: error', url, { time: Date.now(), error: String(e) }); reject(e) }
+      })
   } catch (e) {
-    console.debug('[webrtc] connectSignalingByCandidateIp: exception', url, e)
+    console.debug('[webrtc] connectSignalingByCandidateIp: exception', url, { time: Date.now(), error: String(e) })
     return null
   }
 }
@@ -58,19 +58,22 @@ async function discoverAndConnectSignaling() {
 
   // discover local IP candidates via RTCPeerConnection gather
   const ips = await discoverLocalIPs()
+  console.debug('[webrtc] discoverAndConnectSignaling: discovered local IPs', ips)
   attempts.push(...ips)
 
   for (const a of attempts) {
     try {
-      console.debug('[webrtc] discoverAndConnectSignaling: attempt', a)
+      console.debug('[webrtc] discoverAndConnectSignaling: attempt', a, { time: Date.now() })
       const s = await connectSignalingByCandidateIp(a)
       if (s) {
         ws = s
         setupWs()
-        console.debug('[webrtc] discoverAndConnectSignaling: using signaling', a)
+        console.debug('[webrtc] discoverAndConnectSignaling: using signaling', a, { time: Date.now() })
         return true
+      } else {
+        console.debug('[webrtc] discoverAndConnectSignaling: no signaling at', a)
       }
-    } catch(e){}
+    } catch(e){ console.debug('[webrtc] discoverAndConnectSignaling: attempt exception', a, String(e)) }
   }
   return false
 }
@@ -78,12 +81,22 @@ async function discoverAndConnectSignaling() {
 function setupWs() {
   if (!ws) return
   ws.onopen = () => {
+    console.debug('[webrtc] setupWs: ws.open, announcing room', ROOM, { time: Date.now(), clientId })
     ws!.send(JSON.stringify({ type: 'join', room: ROOM }))
     // announce presence
     ws!.send(JSON.stringify({ type: 'announce', room: ROOM, id: clientId }))
   }
+  ws.onclose = (ev) => { console.debug('[webrtc] setupWs: ws.close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean }) }
+  ws.onerror = (e) => { console.debug('[webrtc] setupWs: ws.error', String(e)) }
   ws.onmessage = async (ev) => {
-    const msg = JSON.parse(ev.data)
+    let msg: any = null
+    try {
+      msg = JSON.parse(ev.data)
+    } catch (e) {
+      console.debug('[webrtc] setupWs: invalid JSON message', String(e), ev.data)
+      return
+    }
+    console.debug('[webrtc] setupWs: got message', msg)
     if (msg.type === 'signal') {
       const { from, payload } = msg
       await handleSignal(from, payload)
@@ -103,6 +116,7 @@ function setupWs() {
 function dbg() { try { console.debug('[webrtc]', ...arguments) } catch(e){} }
 
 async function handleSignal(from: string, payload: any) {
+  console.debug('[webrtc] handleSignal: from', from, payload && payload.type)
   if (!peers.has(from)) {
     await createPeerConnection(from, false)
   }
@@ -120,6 +134,7 @@ async function handleSignal(from: string, payload: any) {
 }
 
 async function initiateOffer(remoteId: string) {
+  console.debug('[webrtc] initiateOffer: remoteId', remoteId)
   const pc = await createPeerConnection(remoteId, true)
   const offer = await pc.createOffer()
   await pc.setLocalDescription(offer)
@@ -156,9 +171,9 @@ async function createPeerConnection(remoteId: string, createChannel: boolean) {
 function setupDataChannel(remoteId: string, dc: RTCDataChannel) {
   channels.set(remoteId, dc)
   dc.binaryType = 'arraybuffer'
-  dc.onopen = () => dbg('dc.open', remoteId)
-  dc.onclose = () => dbg('dc.close', remoteId)
-  dc.onerror = (e) => dbg('dc.error', remoteId, e)
+  dc.onopen = () => { dbg('dc.open', remoteId); dbg('dc.count', channels.size) }
+  dc.onclose = () => { dbg('dc.close', remoteId); dbg('dc.count', channels.size) }
+  dc.onerror = (e) => dbg('dc.error', remoteId, String(e))
   dc.onmessage = (ev) => {
     dbg('dc.onmessage', remoteId)
     if (typeof ev.data === 'string') {
@@ -175,6 +190,7 @@ function setupDataChannel(remoteId: string, dc: RTCDataChannel) {
 const reassembly = new Map<string, { name: string, size: number, received: number, chunks: Array<Uint8Array> }>()
 
 function handleIncomingChunk(meta: any, chunkBuf: ArrayBuffer) {
+  console.debug('[webrtc] handleIncomingChunk: meta.type=', meta.type)
   if (meta.type === 'chunk') {
     const id = meta.id
     const rec = reassembly.get(id) || { name: meta.name, size: meta.size, received: 0, chunks: [] }
@@ -205,9 +221,10 @@ function handleIncomingChunk(meta: any, chunkBuf: ArrayBuffer) {
 
 // Public API
 export async function startAutoMesh() {
-  dbg('startAutoMesh: starting discovery')
+  dbg('startAutoMesh: starting discovery', { time: Date.now() })
+  const start = Date.now()
   const ok = await discoverAndConnectSignaling()
-  dbg('startAutoMesh: discovery result=', ok)
+  dbg('startAutoMesh: discovery result=', ok, { durationMs: Date.now() - start })
 }
 
 export function getConnectedPeerCount() {
@@ -227,7 +244,7 @@ export async function sendFileToAll(file: File) {
     const meta = { type: 'chunk', id, index, name: file.name, size: total }
     const framed = frameChunk(meta, chunk)
     for (const dc of channels.values()) {
-      try { dc.send(framed) } catch (e) {}
+      try { dc.send(framed) } catch (e) { dbg('sendFileToAll: send error', String(e)) }
     }
     index++
   }
@@ -244,10 +261,11 @@ export async function sendTextToAll(text: string) {
     const out = new Uint8Array(4 + enc.byteLength)
     out.set(new Uint8Array(header), 0)
     out.set(enc, 4)
-    for (const dc of channels.values()) {
-      try { dc.send(out.buffer) } catch (e) { dbg('sendTextToAll: send error', e) }
+    let sent = 0
+    for (const [peerId, dc] of Array.from(channels.entries())) {
+      try { dc.send(out.buffer); sent++ } catch (e) { dbg('sendTextToAll: send error to', peerId, String(e)) }
     }
-    dbg('sendTextToAll: sent', { id, text, peers: channels.size })
+    dbg('sendTextToAll: sent', { id, text, peersAttempted: channels.size, peersSucceeded: sent })
   } catch (e) {
     dbg('sendTextToAll: unexpected error', e)
   }
