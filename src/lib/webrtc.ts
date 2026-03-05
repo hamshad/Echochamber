@@ -81,22 +81,22 @@ async function discoverAndConnectSignaling() {
 function setupWs() {
   if (!ws) return
   ws.onopen = () => {
-    console.debug('[webrtc] setupWs: ws.open, announcing room', ROOM, { time: Date.now(), clientId })
+    dbg('setupWs: ws.open, announcing room', ROOM, { time: Date.now(), clientId })
     ws!.send(JSON.stringify({ type: 'join', room: ROOM }))
     // announce presence
     ws!.send(JSON.stringify({ type: 'announce', room: ROOM, id: clientId }))
   }
-  ws.onclose = (ev) => { console.debug('[webrtc] setupWs: ws.close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean }) }
-  ws.onerror = (e) => { console.debug('[webrtc] setupWs: ws.error', String(e)) }
+  ws.onclose = (ev) => { dbg('setupWs: ws.close', { code: ev.code, reason: ev.reason, wasClean: ev.wasClean }) }
+  ws.onerror = (e) => { dbg('setupWs: ws.error', String(e)) }
   ws.onmessage = async (ev) => {
     let msg: any = null
     try {
       msg = JSON.parse(ev.data)
     } catch (e) {
-      console.debug('[webrtc] setupWs: invalid JSON message', String(e), ev.data)
+      dbg('setupWs: invalid JSON message', String(e), ev.data)
       return
     }
-    console.debug('[webrtc] setupWs: got message', msg)
+    dbg('setupWs: got message', msg)
     if (msg.type === 'signal') {
       const { from, payload } = msg
       await handleSignal(from, payload)
@@ -104,9 +104,13 @@ function setupWs() {
     if (msg.type === 'announce') {
       const remoteId = msg.id
       if (remoteId === clientId) return
+      dbg('setupWs: peer announced', remoteId)
       // To avoid collision, only one side initiates offer: compare ids
       if (remoteId > clientId) {
+        dbg('setupWs: initiating offer to', remoteId)
         await initiateOffer(remoteId)
+      } else {
+        dbg('setupWs: waiting for offer from', remoteId)
       }
     }
   }
@@ -124,20 +128,25 @@ function dbg(...args: any[]) {
 }
 
 async function handleSignal(from: string, payload: any) {
-  console.debug('[webrtc] handleSignal: from', from, payload && payload.type)
+  dbg('handleSignal: from', from, payload && payload.type)
   if (!peers.has(from)) {
+    dbg('handleSignal: auto-creating peer for signal from', from)
     await createPeerConnection(from, false)
   }
   const pc = peers.get(from)!
   if (payload.type === 'offer') {
+    dbg('handleSignal: setting remote offer', from)
     await pc.setRemoteDescription(payload.desc)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
+    dbg('handleSignal: sending answer to', from)
     ws!.send(JSON.stringify({ type: 'signal', room: ROOM, from: clientId, payload: { to: from, type: 'answer', desc: pc.localDescription } }))
   } else if (payload.type === 'answer') {
+    dbg('handleSignal: setting remote answer', from)
     await pc.setRemoteDescription(payload.desc)
   } else if (payload.type === 'candidate') {
-    try { await pc.addIceCandidate(payload.candidate) } catch(e){}
+    dbg('handleSignal: adding ICE candidate', from)
+    try { await pc.addIceCandidate(payload.candidate) } catch(e){ dbg('handleSignal: candidate err', e) }
   }
 }
 
