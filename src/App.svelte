@@ -14,7 +14,7 @@
 </script>
 
 <main>
-  <h1>LAN Share</h1>
+  <h1>Echochamber</h1>
   <section data-test="text-share">
     <TextShare />
   </section>
