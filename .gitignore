@@ -1,0 +1,21 @@
+node_modules/
+.env
+.env.*
+.DS_Store
+dist/
+.idea/
+.vscode/
+.npm/
+.parcel-cache/
+*.log
+coverage/
+.nyc_output/
+.sass-cache/
+.history/
+.pnp.*
+Thumbs.db
+Desktop.ini
+
+# Optional tooling
+*.tgz
+.cache
