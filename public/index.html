@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Echochamber</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js" type="module" defer></script>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Echochamber</h1>
+        <p class="subtitle">Drop files or paste text — shared with everyone on your network</p>
+        <div class="status" id="status">
+          <span class="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+      </header>
+
+      <section class="input-section">
+        <div class="text-input-wrapper">
+          <textarea id="text-input" placeholder="Paste text, keys, code snippets..." rows="4"></textarea>
+          <button id="share-text-btn" class="btn btn-primary">Share Text</button>
+        </div>
+
+        <div class="file-upload-wrapper">
+          <label class="file-upload-label" for="file-input">
+            <span class="upload-icon">📁</span>
+            <span>Choose files or drag & drop anywhere</span>
+          </label>
+          <input type="file" id="file-input" multiple hidden />
+        </div>
+      </section>
+
+      <div id="upload-progress" class="upload-progress hidden">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <span id="progress-text">Uploading...</span>
+      </div>
+
+      <section class="items-section">
+        <h2>Shared Items <span id="item-count" class="item-count"></span></h2>
+        <div id="items-grid" class="items-grid"></div>
+        <div id="empty-state" class="empty-state">
+          <p>Nothing shared yet</p>
+          <p class="hint">Drop a file or paste some text to get started</p>
+        </div>
+      </section>
+
+      <div id="drag-overlay" class="drag-overlay hidden">
+        <div class="drag-overlay-content">
+          <span class="drag-icon">📥</span>
+          <p>Drop files to share</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
