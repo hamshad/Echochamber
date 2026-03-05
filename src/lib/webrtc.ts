@@ -53,28 +53,36 @@ async function connectSignalingByCandidateIp(ip: string) {
 async function discoverAndConnectSignaling() {
   // Try well-known: same host as page, localhost, and local IPs discovered via RTCPeerConnection
   const attempts: string[] = []
-  try { attempts.push(location.hostname) } catch(e){}
+  try { 
+    if (location.hostname && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      attempts.push(location.hostname) 
+    }
+  } catch(e){}
+  attempts.push('localhost')
   attempts.push('127.0.0.1')
 
   // discover local IP candidates via RTCPeerConnection gather
   const ips = await discoverLocalIPs()
-  console.debug('[webrtc] discoverAndConnectSignaling: discovered local IPs', ips)
+  dbg('discoverAndConnectSignaling: discovered local IPs', ips)
   attempts.push(...ips)
 
-  for (const a of attempts) {
+  // Deduplicate attempts
+  const uniqueAttempts = Array.from(new Set(attempts))
+  dbg('discoverAndConnectSignaling: all unique candidates', uniqueAttempts)
+
+  for (const a of uniqueAttempts) {
     try {
-      console.debug('[webrtc] discoverAndConnectSignaling: attempt', a, { time: Date.now() })
+      dbg('discoverAndConnectSignaling: attempt', a, { time: Date.now() })
       const s = await connectSignalingByCandidateIp(a)
       if (s) {
         ws = s
         setupWs()
-        console.debug('[webrtc] discoverAndConnectSignaling: using signaling', a, { time: Date.now() })
+        dbg('discoverAndConnectSignaling: SUCCESS using signaling at', a, { time: Date.now() })
         return true
-      } else {
-        console.debug('[webrtc] discoverAndConnectSignaling: no signaling at', a)
       }
-    } catch(e){ console.debug('[webrtc] discoverAndConnectSignaling: attempt exception', a, String(e)) }
+    } catch(e){ dbg('discoverAndConnectSignaling: attempt exception', a, String(e)) }
   }
+  dbg('discoverAndConnectSignaling: FAILED all candidates')
   return false
 }
 
