@@ -15,20 +15,38 @@ function send(ws, obj) {
 }
 
 wss.on('connection', (ws) => {
+  console.log('[signaling] new connection')
   ws.on('message', raw => {
     let msg
     try { msg = JSON.parse(raw.toString()) } catch (e) { return }
-    const { type, room, payload } = msg
+    const { type, room, payload, from, id } = msg
+    
     if (type === 'join') {
+      console.log(`[signaling] join room: ${room}`)
       if (!rooms.has(room)) rooms.set(room, new Set())
       rooms.get(room).add(ws)
       ws.room = room
+      return
     }
-    if (type === 'signal') {
+
+    if (type === 'announce') {
+      console.log(`[signaling] announce in ${room}: ${id}`)
       const set = rooms.get(room)
       if (!set) return
       for (const client of set) {
-        if (client !== ws) send(client, { type: 'signal', payload })
+        if (client !== ws) send(client, { type: 'announce', id, room })
+      }
+      return
+    }
+
+    if (type === 'signal') {
+      const set = rooms.get(room)
+      if (!set) return
+      // payload usually contains { to, type, desc/candidate }
+      const targetId = payload?.to
+      console.log(`[signaling] signal in ${room} from ${from} to ${targetId || 'all'}`)
+      for (const client of set) {
+        if (client !== ws) send(client, { type: 'signal', from, payload })
       }
     }
   })
