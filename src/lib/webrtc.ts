@@ -105,6 +105,20 @@ function setupWs() {
       return
     }
     dbg('setupWs: got message', msg)
+    if (msg.type === 'text-received') {
+      dbg('setupWs: received cached/broadcast text', msg.text)
+      import('../stores/shares').then(mod => {
+        mod.addTextShare(msg.text)
+        window.dispatchEvent(new CustomEvent('lan-share-text', { detail: { text: msg.text } }))
+      })
+    }
+    if (msg.type === 'file-announced') {
+      dbg('setupWs: received cached/broadcast file announcement', msg.name)
+      import('../stores/shares').then(mod => {
+        mod.addFileShare(msg.name, msg.size)
+        // Note: Actual download still needs direct P2P or a separate storage link
+      })
+    }
     if (msg.type === 'signal') {
       const { from, payload } = msg
       await handleSignal(from, payload)
@@ -274,6 +288,16 @@ export async function sendFileToAll(file: File) {
     index++
   }
   dbg('sendFileToAll: finished sending', { id, name: file.name, total })
+}
+
+// Send a message to the signaling server for broadcasting and caching
+export function sendShare(msg: any) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    dbg('sendShare: sending through signaling server', msg.type)
+    ws.send(JSON.stringify({ ...msg, room: ROOM, id: uid() }))
+  } else {
+    dbg('sendShare: signaling server not connected')
+  }
 }
 
 // Send short text messages to all peers

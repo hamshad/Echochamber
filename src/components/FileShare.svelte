@@ -15,8 +15,10 @@
     if (!input.files || input.files.length === 0) return
     const f = input.files[0]
     addFileShare(f.name, f.size)
-    // send to all connected peers (mesh). If mesh empty, nothing happens.
     try {
+      const { sendShare } = await import('../lib/webrtc')
+      sendShare({ type: 'share-file', name: f.name, size: f.size })
+      // Still attempt direct P2P transfer if peers are connected
       const { sendFileToAll } = await import('../lib/webrtc')
       await sendFileToAll(f)
     } catch (err) {

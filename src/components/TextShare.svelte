@@ -10,18 +10,18 @@
     addTextShare(txt)
     text = ''
     try {
-      const mod = await import('../lib/webrtc')
-      await mod.sendTextToAll(txt)
+      const { sendShare } = await import('../lib/webrtc')
+      sendShare({ type: 'share-text', text: txt })
     } catch (e) {
-      console.debug('[TextShare] send: mesh send failed', e)
+      console.debug('[TextShare] send: failed', e)
     }
   }
 
   // Listen for incoming remote text events (dispatched by webrtc on receive)
   if (typeof window !== 'undefined') {
     window.addEventListener('lan-share-text', (ev) => {
-      // Already added by webrtc via addTextShare, this allows for UI notifications if needed
-      console.debug('[TextShare] lan-share-text event', ev.detail)
+      // Incoming text is already added to store by webrtc, this is just for awareness
+      console.debug('[TextShare] received text', ev.detail.text)
     })
   }
 </script>
