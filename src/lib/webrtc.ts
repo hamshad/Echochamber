@@ -40,7 +40,7 @@ async function connectSignalingByCandidateIp(ip: string) {
   try {
     const socket = new WebSocket(url)
     return await new Promise<WebSocket>((resolve, reject) => {
-      const t = setTimeout(() => { reject(new Error('timeout')) }, 3000)
+      const t = setTimeout(() => { reject(new Error('timeout')) }, 5000)
       socket.onopen = () => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: connected', url, { time: Date.now() }); resolve(socket) }
       socket.onerror = (e) => { clearTimeout(t); console.debug('[webrtc] connectSignalingByCandidateIp: error', url, { time: Date.now(), error: String(e) }); reject(e) }
       })
@@ -256,14 +256,10 @@ export async function sendTextToAll(text: string) {
   try {
     const id = uid()
     const meta = { type: 'text', id, text, ts: Date.now() }
-    const enc = new TextEncoder().encode(JSON.stringify(meta))
-    const header = new Uint32Array([enc.byteLength]).buffer
-    const out = new Uint8Array(4 + enc.byteLength)
-    out.set(new Uint8Array(header), 0)
-    out.set(enc, 4)
+    const framed = frameChunk(meta, new ArrayBuffer(0))
     let sent = 0
     for (const [peerId, dc] of Array.from(channels.entries())) {
-      try { dc.send(out.buffer); sent++ } catch (e) { dbg('sendTextToAll: send error to', peerId, String(e)) }
+      try { dc.send(framed); sent++ } catch (e) { dbg('sendTextToAll: send error to', peerId, String(e)) }
     }
     dbg('sendTextToAll: sent', { id, text, peersAttempted: channels.size, peersSucceeded: sent })
   } catch (e) {
