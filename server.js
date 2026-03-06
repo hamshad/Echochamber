@@ -133,11 +133,17 @@ app.get('/api/download/:id', (req, res) => {
   const item = items.get(id);
   if (!item || item.expiresAt <= Date.now()) return res.status(404).json({ error: 'Not found' });
   if (item.type !== 'file') return res.status(400).json({ error: 'Not a file item' });
-  const filePath = path.join(UPLOADS_DIR, item.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing' });
+
   res.setHeader('Content-Disposition', `attachment; filename="${item.originalName}"`);
   res.setHeader('Content-Type', item.mimetype || 'application/octet-stream');
-  return res.download(filePath, item.originalName);
+
+  const fileRef = bucket.file(item.filename);
+  fileRef.createReadStream()
+    .on('error', (err) => {
+      console.error('[Download] Firebase read error:', err && err.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
+    })
+    .pipe(res);
 });
 
 // DELETE /api/items/:id
@@ -146,9 +152,9 @@ app.delete('/api/items/:id', (req, res) => {
   const item = items.get(id);
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (item.type === 'file' && item.filename) {
-    const filePath = path.join(UPLOADS_DIR, item.filename);
-    fs.unlink(filePath, (err) => {
-      if (err && err.code !== 'ENOENT') console.error('[Delete] Failed to delete file:', err.message);
+    bucket.file(item.filename).delete().catch((err) => {
+      // Ignore not-found errors
+      if (err && err.code !== 404) console.error('[Delete] Firebase delete error:', err && err.message);
     });
   }
   items.delete(id);
@@ -166,21 +172,24 @@ io.on('connection', (socket) => {
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
+  const affectedRooms = new Set();
   for (const [id, item] of items) {
     if (now > item.expiresAt) {
       if (item.type === 'file' && item.filename) {
-        const filePath = path.join(UPLOADS_DIR, item.filename);
-        fs.unlink(filePath, (err) => {
-          if (err && err.code !== 'ENOENT') console.error('[Cleanup] Failed to delete file:', err.message);
+        bucket.file(item.filename).delete().catch((err) => {
+          if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
         });
       }
+      affectedRooms.add(item.roomId);
       items.delete(id);
       cleaned++;
     }
   }
   if (cleaned > 0) {
     console.log(`[Cleanup] Removed ${cleaned} expired item(s)`);
-    io.emit('items:sync', getActiveItems());
+    for (const roomId of affectedRooms) {
+      io.emit('items:sync', getActiveItems(roomId));
+    }
   }
 }, CLEANUP_INTERVAL);
 
