@@ -49,9 +49,11 @@ const bucket = getStorage().bucket();
 
 const items = new Map();
 
-function getActiveItems() {
+function getActiveItems(roomId) {
   const now = Date.now();
-  return Array.from(items.values()).filter(i => i.expiresAt > now).sort((a, b) => b.createdAt - a.createdAt);
+  return Array.from(items.values())
+    .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 const app = express();
@@ -105,7 +107,7 @@ app.post('/api/text', (req, res) => {
     expiresAt: now + TTL
   };
   items.set(id, item);
-  io.emit('item:added', item);
+  io.to(item.roomId).emit('item:added', item);
   return res.status(201).json(item);
 });
 
@@ -141,7 +143,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     expiresAt: now + TTL
   };
   items.set(id, item);
-  io.emit('item:added', item);
+  io.to(item.roomId).emit('item:added', item);
   return res.status(201).json(item);
 });
 
@@ -179,14 +181,19 @@ app.delete('/api/items/:id', (req, res) => {
     });
   }
   items.delete(id);
-  io.emit('item:removed', { id });
+  io.to(item.roomId).emit('item:removed', { id });
   return res.json({ success: true });
 });
 
 // Socket.IO
 io.on('connection', (socket) => {
-  console.log('[Socket.IO] Client connected:', socket.id);
-  socket.emit('items:sync', getActiveItems());
+  // Extract public IP from handshake headers (x-forwarded-for), fallback to socket address
+  const forwarded = socket.handshake.headers['x-forwarded-for'];
+  const roomId = forwarded ? forwarded.split(',')[0].trim() : (socket.handshake.address || 'local');
+
+  socket.join(roomId);
+  console.log('[Socket.IO] Client connected:', socket.id, '→ room:', roomId);
+  socket.emit('items:sync', getActiveItems(roomId));
 });
 
 // Cleanup scheduler
@@ -206,12 +213,12 @@ const cleanupTimer = setInterval(() => {
       cleaned++;
     }
   }
-  if (cleaned > 0) {
-    console.log(`[Cleanup] Removed ${cleaned} expired item(s)`);
-    for (const roomId of affectedRooms) {
-      io.emit('items:sync', getActiveItems(roomId));
+    if (cleaned > 0) {
+      console.log(`[Cleanup] Removed ${cleaned} expired item(s)`);
+      for (const roomId of affectedRooms) {
+        io.to(roomId).emit('items:sync', getActiveItems(roomId));
+      }
     }
-  }
 }, CLEANUP_INTERVAL);
 
 function getLocalIPs() {
