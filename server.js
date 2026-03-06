@@ -7,6 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 
 const PORT = process.env.PORT || 3000;
 const TTL = 60 * 60 * 1000; // 1 hour
@@ -14,18 +16,36 @@ const CLEANUP_INTERVAL = 60 * 1000; // 60 seconds
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-
-// Ensure directories exist when running locally. On serverless platforms, skip creating uploads directory.
+// Firebase Admin initialization
+// Prefer environment-provided service account JSON (FIREBASE_SERVICE_ACCOUNT).
+// For local development, fall back to reading a service account JSON file if present.
+let serviceAccount = {};
 try {
-  if (process.env.DISABLE_UPLOAD_DIR !== 'true') {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    // Attempt to find a service account file in project root matching *-firebase-adminsdk-*.json
+    const files = fs.readdirSync(__dirname).filter(f => /firebase-adminsdk-.*\.json$/.test(f));
+    if (files.length) {
+      serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, files[0]), 'utf8'));
+    }
   }
-} catch (err) {
-  // On serverless platforms the filesystem may be read-only. Log and continue.
-  console.warn('[Startup] Could not create uploads directory, proceeding without local uploads:', err && err.message);
+} catch (e) {
+  console.warn('[Startup] Could not parse Firebase service account JSON — Firebase init will be attempted with empty credentials');
 }
-fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
+
+const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'rnfirebase-c3268.firebasestorage.app';
+try {
+  if (serviceAccount && Object.keys(serviceAccount).length) {
+    initializeApp({ credential: cert(serviceAccount), storageBucket: bucketName });
+  } else {
+    // initializeApp without explicit credential will let Firebase SDK attempt default credentials
+    initializeApp({ storageBucket: bucketName });
+  }
+} catch (e) {
+  console.warn('[Startup] Firebase initializeApp warning:', e && e.message);
+}
+const bucket = getStorage().bucket();
 
 const items = new Map();
 
@@ -38,12 +58,8 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer setup
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
+// Multer setup — use memory storage so we can upload buffers to Firebase Storage
+const upload = multer({ storage: multer.memoryStorage() });
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e9 });
@@ -78,16 +94,28 @@ app.post('/api/text', (req, res) => {
 });
 
 // POST /api/upload
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file provided' });
+
   const id = uuidv4();
+  const ext = path.extname(file.originalname);
+  const storageName = id + ext;
+
+  try {
+    const fileRef = bucket.file(storageName);
+    await fileRef.save(file.buffer, { metadata: { contentType: file.mimetype } });
+  } catch (err) {
+    console.error('[Upload] Firebase Storage error:', err && err.message);
+    return res.status(500).json({ error: 'Storage upload failed' });
+  }
+
   const now = Date.now();
   const item = {
     id,
     type: 'file',
     content: null,
-    filename: file.filename,
+    filename: storageName,
     originalName: file.originalname,
     mimetype: file.mimetype,
     size: file.size,
