@@ -16,8 +16,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
-// Ensure directories exist
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Ensure directories exist when running locally. On serverless platforms, skip creating uploads directory.
+try {
+  if (process.env.DISABLE_UPLOAD_DIR !== 'true') {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  // On serverless platforms the filesystem may be read-only. Log and continue.
+  console.warn('[Startup] Could not create uploads directory, proceeding without local uploads:', err && err.message);
+}
 fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
 
 const items = new Map();
