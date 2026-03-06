@@ -58,6 +58,19 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Trust reverse proxies (Vercel) so req.ip and x-forwarded-for are populated correctly
+app.set('trust proxy', true);
+
+// Helper: extract public IP (roomId) from request
+function getRoomId(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const first = forwarded.split(',')[0].trim();
+    if (first) return first;
+  }
+  return req.socket?.remoteAddress || 'local';
+}
+
 // Multer setup — use memory storage so we can upload buffers to Firebase Storage
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -66,7 +79,8 @@ const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e9 })
 
 // API: GET /api/items
 app.get('/api/items', (req, res) => {
-  res.json(getActiveItems());
+  const roomId = getRoomId(req);
+  res.json(getActiveItems(roomId));
 });
 
 // POST /api/text
@@ -77,9 +91,11 @@ app.post('/api/text', (req, res) => {
   }
   const id = uuidv4();
   const now = Date.now();
+  const roomId = getRoomId(req);
   const item = {
     id,
     type: 'text',
+    roomId,
     content,
     filename: null,
     originalName: null,
@@ -111,9 +127,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 
   const now = Date.now();
+  const roomId = getRoomId(req);
   const item = {
     id,
     type: 'file',
+    roomId,
     content: null,
     filename: storageName,
     originalName: file.originalname,
@@ -151,6 +169,9 @@ app.delete('/api/items/:id', (req, res) => {
   const id = req.params.id;
   const item = items.get(id);
   if (!item) return res.status(404).json({ error: 'Not found' });
+  const roomId = getRoomId(req);
+  if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
+
   if (item.type === 'file' && item.filename) {
     bucket.file(item.filename).delete().catch((err) => {
       // Ignore not-found errors
