@@ -34,7 +34,8 @@ socket.on('items:sync', (data) => {
 });
 
 socket.on('item:added', (item) => {
-  items = [item, ...items];
+  // Replace any optimistic placeholder with the real item
+  items = [item, ...items.filter(i => !(i.optimistic && i.originalName === item.originalName && i.size === item.size))];
   renderItems();
 });
 
@@ -89,6 +90,18 @@ async function uploadFiles(files){
     formData.append('file', file);
     // include this client's socket id so server can notify uploader immediately (handles some proxy cases)
     if(socket && socket.id) formData.append('socketId', socket.id);
+    // Optimistic UI: create a temporary client-side card immediately so uploader sees feedback
+    const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
+    items = [{
+      id: optimisticId,
+      type: 'file',
+      originalName: file.name,
+      size: file.size,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60*60*1000,
+      optimistic: true
+    }, ...items];
+    renderItems();
     try{
       await new Promise((resolve,reject)=>{
         const xhr = new XMLHttpRequest();
@@ -107,7 +120,7 @@ async function uploadFiles(files){
         xhr.onerror = ()=>reject(new Error('Upload failed'));
         xhr.send(formData);
       });
-    }catch(err){ console.error('Upload error:',err); }
+      }catch(err){ console.error('Upload error:',err); }
   }
   hideProgress();
 }
@@ -153,6 +166,7 @@ function renderTextCard(item){
 function renderFileCard(item){
   const timeLeft = getTimeLeft(item.expiresAt);
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+  const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
   return `
     <div class="item-card file" data-id="${item.id}">
       <div class="item-header">
@@ -164,6 +178,7 @@ function renderFileCard(item){
       <div class="file-name">${escapeHtml(item.originalName)}</div>
       <div class="file-size">${formatFileSize(item.size)}</div>
       <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')">⬇ Download</button>
+      ${optimisticNote}
       <div class="item-footer">
         <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
       </div>

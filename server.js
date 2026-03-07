@@ -118,15 +118,21 @@ app.post('/api/text', (req, res) => {
     expiresAt: now + TTL
   };
   items.set(id, item);
+  // Broadcast to the room
+  console.log(`[Broadcast] room=${item.roomId} id=${id}`);
   io.to(item.roomId).emit('item:added', item);
+
   // If uploader provided their socket id (multipart field `socketId`), ensure they get the event
   try {
     const uploaderSocketId = req.body && req.body.socketId;
     if (uploaderSocketId) {
       const sock = io.sockets.sockets.get(uploaderSocketId);
       const inRoom = sock && sock.rooms && sock.rooms.has(item.roomId);
+      console.log(`[Upload] uploaderSocketId=${uploaderSocketId} socketFound=${!!sock} inRoom=${!!inRoom} room=${item.roomId}`);
       if (sock && !inRoom) {
+        // Fallback direct emit to uploader socket
         io.to(uploaderSocketId).emit('item:added', item);
+        console.log('[Upload] fallback emit to uploader socket id', uploaderSocketId);
       }
     }
   } catch (e) {
