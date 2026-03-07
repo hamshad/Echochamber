@@ -281,8 +281,10 @@ process.on('SIGTERM', shutdown);
 
 // Only start listening when run directly (not when imported by tests)
 // Vercel sets process.env.VERCEL, and usually runs the script via its own runner.
-const isMainModule = (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) || process.env.VERCEL;
+// We check for VERCEL or if it's the main module to ensure it runs in both local and cloud.
+const isMainModule = (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) || process.env.VERCEL || process.env.NODE_ENV === 'production';
 if (isMainModule) {
+  console.log('[Startup] Starting server (isMainModule=true, VERCEL=' + !!process.env.VERCEL + ')');
   server.listen(PORT, () => {
     console.log('\n' + '═'.repeat(50));
     console.log('  🔗 Echochamber is running!\n');
