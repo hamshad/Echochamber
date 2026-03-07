@@ -87,6 +87,8 @@ async function uploadFiles(files){
     showProgress(`Uploading ${file.name}...`);
     const formData = new FormData();
     formData.append('file', file);
+    // include this client's socket id so server can notify uploader immediately (handles some proxy cases)
+    if(socket && socket.id) formData.append('socketId', socket.id);
     try{
       await new Promise((resolve,reject)=>{
         const xhr = new XMLHttpRequest();

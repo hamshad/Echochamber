@@ -119,6 +119,20 @@ app.post('/api/text', (req, res) => {
   };
   items.set(id, item);
   io.to(item.roomId).emit('item:added', item);
+  // If uploader provided their socket id (multipart field `socketId`), ensure they get the event
+  try {
+    const uploaderSocketId = req.body && req.body.socketId;
+    if (uploaderSocketId) {
+      const sock = io.sockets.sockets.get(uploaderSocketId);
+      const inRoom = sock && sock.rooms && sock.rooms.has(item.roomId);
+      if (sock && !inRoom) {
+        io.to(uploaderSocketId).emit('item:added', item);
+      }
+    }
+  } catch (e) {
+    // Non-fatal — continue
+    console.warn('[Upload] socket emit fallback failed:', e && e.message);
+  }
   return res.status(201).json(item);
 });
 
