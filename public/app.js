@@ -380,20 +380,29 @@ window.downloadFile = function(id){ window.open(`/api/download/${id}`,'_blank');
 
 // Modal handling
 const textModal = document.getElementById('text-modal');
-const modalTextarea = document.getElementById('modal-textarea');
+let modalTextarea = document.getElementById('modal-textarea');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 const modalSaveBtn = document.getElementById('modal-save-btn');
 const modalCopyBtn = document.getElementById('modal-copy-btn');
-const modalFormatBtn = document.getElementById('modal-format-btn');
+const modalEditBtn = document.getElementById('modal-edit-btn');
 let modalEditingId = null;
 
 window.openTextModal = function(id){
   const item = items.find(i => i.id === id);
   if(!item) return;
   modalEditingId = id;
-  modalTextarea.value = item.content || '';
+  // Ensure the textarea exists but hide it; we'll show preview by default
+  modalTextarea = document.getElementById('modal-textarea');
+  modalTextarea.style.display = 'none';
+  const body = document.querySelector('.text-modal-body');
+  body.innerHTML = '';
+  const preview = document.createElement('div');
+  preview.className = 'preview';
+  preview.id = 'modal-preview';
+  preview.textContent = item.content || '';
+  body.appendChild(preview);
   textModal.classList.remove('hidden');
-  modalTextarea.focus();
+  modalSaveBtn.disabled = true;
 }
 
 function closeTextModal(){
@@ -402,22 +411,44 @@ function closeTextModal(){
 }
 
 modalCloseBtn.addEventListener('click', closeTextModal);
-modalCopyBtn.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(modalTextarea.value); modalCopyBtn.textContent = '✓'; setTimeout(()=>modalCopyBtn.textContent='📋',1200); }catch(e){console.error(e)} });
-// Removed formatting button; no-op kept for backward compatibility
 
-modalSaveBtn.addEventListener('click', async ()=>{
+modalCopyBtn.addEventListener('click', async ()=>{
+  try{
+    const preview = document.getElementById('modal-preview');
+    const text = preview ? preview.textContent : (modalTextarea ? modalTextarea.value : '');
+    await navigator.clipboard.writeText(text);
+    modalCopyBtn.textContent = '✓'; setTimeout(()=>modalCopyBtn.textContent='📋',1200);
+  } catch(e){ console.error(e); }
+});
+
+async function saveModalText(){
   if(!modalEditingId) return;
-  const updated = modalTextarea.value;
+  const ta = document.getElementById('modal-textarea');
+  const updated = ta ? ta.value : '';
   try{
     const res = await fetch('/api/text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: updated }) });
-    // naive approach: create a new item with updated text and delete old one
     if(res.ok){
-      // delete old
       await fetch(`/api/items/${modalEditingId}`, { method: 'DELETE' }).catch(()=>{});
       closeTextModal();
     }
   }catch(e){ console.error('Save text failed', e); }
-});
+}
+
+modalSaveBtn.addEventListener('click', saveModalText);
+
+function enterEditMode(){
+  const preview = document.getElementById('modal-preview');
+  const body = document.querySelector('.text-modal-body');
+  // Replace preview with textarea
+  body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
+  const ta = document.getElementById('modal-textarea');
+  ta.value = preview ? preview.textContent : '';
+  ta.style.display = 'block';
+  ta.focus();
+  modalSaveBtn.disabled = false;
+}
+
+modalEditBtn.addEventListener('click', ()=>{ enterEditMode(); });
 
 // Keyboard shortcuts: Esc to close, Ctrl/Cmd+S to save, Ctrl/Cmd+C to copy
 document.addEventListener('keydown', (e)=>{
@@ -425,11 +456,11 @@ document.addEventListener('keydown', (e)=>{
   if (e.key === 'Escape') { closeTextModal(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    modalSaveBtn.click();
+    saveModalText();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-    // If textarea focused, let native copy; otherwise trigger copy
-    if (document.activeElement !== modalTextarea) {
+    const ta = document.getElementById('modal-textarea');
+    if (!ta || document.activeElement !== ta) {
       e.preventDefault();
       modalCopyBtn.click();
     }
