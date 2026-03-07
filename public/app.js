@@ -407,6 +407,23 @@ window.openTextModal = function(id){
   modalSaveBtn.disabled = true;
 }
 
+// Start frame animation for sleepy-sprite (4 frames) if present
+function startSleepyAnimation(){
+  const wrapper = document.querySelector('.sleepy-wrapper');
+  if(!wrapper) return;
+  const frames = wrapper.querySelectorAll('.sleepy-sprite .frame');
+  if(!frames || frames.length === 0) return;
+  let idx = 0;
+  wrapper.classList.add('playing');
+  setInterval(()=>{
+    frames.forEach((f,i)=> f.style.opacity = (i===idx ? '1' : '0'));
+    idx = (idx + 1) % frames.length;
+  }, 300);
+}
+
+// Run once on load
+document.addEventListener('DOMContentLoaded', ()=> startSleepyAnimation());
+
 function closeTextModal(){
   // Reset modal content to default textarea placeholder so next open is consistent
   const body = document.querySelector('.text-modal-body');
