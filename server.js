@@ -44,35 +44,12 @@ try {
     options.credential = cert(serviceAccount);
   }
   console.log(`[Startup] Initializing Firebase: bucket=${bucketName}, db=${databaseURL}`);
+  if (!databaseURL) throw new Error('FIREBASE_DATABASE_URL is not set');
   initializeApp(options);
 } catch (e) {
-  console.warn('[Startup] Firebase initializeApp error:', e && e.message);
-}
-
-const bucket = getStorage().bucket();
-const db = getDatabase();
-const itemsRef = db.ref('items');
-
-async function getActiveItems(roomId) {
-  const now = Date.now();
-  console.log(`[DB] getActiveItems room=${roomId || 'all'}`);
-  try {
-    const snapshot = await itemsRef.once('value').catch(err => {
-      console.error('[DB] itemsRef.once failed:', err.message);
-      throw err;
-    });
-    const allItems = snapshot.val() || {};
-    return Object.values(allItems)
-      .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
-      .sort((a, b) => b.createdAt - a.createdAt);
-  } catch (err) {
-    console.error('[DB] Failed to fetch items:', err.message);
-    return [];
-  }
-}
-  initializeApp(options);
-} catch (e) {
-  console.warn('[Startup] Firebase initializeApp warning:', e && e.message);
+  console.error('[Startup] Firebase initializeApp error:', e && e.message);
+  // Re-throw if it's a critical initialization error to fail the function early
+  if (process.env.VERCEL) throw e;
 }
 
 const bucket = getStorage().bucket();
@@ -80,16 +57,22 @@ let db;
 let itemsRef;
 try {
   db = getDatabase();
+  if (!db) throw new Error('getDatabase() returned null');
   itemsRef = db.ref('items');
 } catch (e) {
   console.error('[Startup] Firebase Database init error:', e.message);
+  if (process.env.VERCEL) throw e;
 }
 
 async function getActiveItems(roomId) {
   if (!itemsRef) return [];
   const now = Date.now();
+  console.log(`[DB] getActiveItems room=${roomId || 'all'}`);
   try {
-    const snapshot = await itemsRef.once('value');
+    const snapshot = await itemsRef.once('value').catch(err => {
+      console.error('[DB] itemsRef.once failed:', err.message);
+      throw err;
+    });
     const allItems = snapshot.val() || {};
     return Object.values(allItems)
       .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
