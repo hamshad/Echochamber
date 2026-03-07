@@ -66,11 +66,22 @@ app.set('trust proxy', true);
 // Helper: extract public IP (roomId) from request
 function getRoomId(req) {
   const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    const first = forwarded.split(',')[0].trim();
-    if (first) return first;
-  }
-  return req.socket?.remoteAddress || 'local';
+  const raw = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || 'local');
+  return normalizeIp(raw);
+}
+
+function normalizeIp(raw) {
+  if (!raw) return 'local';
+  // remove surrounding whitespace
+  let ip = String(raw).trim();
+  // If it's a comma-separated list, take the first
+  if (ip.includes(',')) ip = ip.split(',')[0].trim();
+  // IPv6 mapped IPv4 ("::ffff:1.2.3.4") -> "1.2.3.4"
+  const v4match = ip.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4match) return v4match[1];
+  // Local IPv6 loopback -> 127.0.0.1
+  if (ip === '::1') return '127.0.0.1';
+  return ip;
 }
 
 // Multer setup — use memory storage so we can upload buffers to Firebase Storage
