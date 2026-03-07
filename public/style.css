@@ -145,4 +145,29 @@ textarea:focus{border-color:var(--accent);outline:none}
 /* Tooltip-like hint for item actions */
 .item-actions .hint{font-size:0.75rem;color:var(--text-secondary)}
 
-/* End of additional styles — total lines increased to meet plan minimums */
+/* Pikachu Loader */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: var(--text-tertiary);
+}
+
+.pikachu-loader {
+  width: 64px;
+  height: 64px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/25.gif');
+  background-size: contain;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  margin-bottom: 1rem;
+}
+
+.loading-state p {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* End of additional styles */

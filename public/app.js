@@ -16,6 +16,7 @@ const uploadProgress = document.getElementById('upload-progress');
 const progressFill = document.getElementById('progress-fill');
 const progressText = document.getElementById('progress-text');
 const itemCount = document.getElementById('item-count');
+const loadingState = document.getElementById('loading-state');
 const statusEl = document.getElementById('status');
 const statusText = document.getElementById('status-text');
 
@@ -60,8 +61,16 @@ async function initFirebase() {
   myIp = await getMyIp();
   console.log('[App] Detected Room IP:', myIp);
   
+  // Show loading state while waiting for the first value
+  loadingState.classList.remove('hidden');
+  emptyState.classList.add('hidden');
+  itemsGrid.classList.add('hidden');
+  
   const itemsRef = ref(db, 'items');
   onValue(itemsRef, (snapshot) => {
+    loadingState.classList.add('hidden');
+    itemsGrid.classList.remove('hidden');
+    
     const data = snapshot.val() || {};
     const allItems = Object.values(data);
     const now = Date.now();
