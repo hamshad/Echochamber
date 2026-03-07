@@ -106,6 +106,13 @@ async function shareText(){
   const content = textInput.value.trim();
   if(!content) return;
   shareTextBtn.disabled = true;
+  
+  // "Eating" animation: collapse the textarea
+  textInput.style.transition = 'all 0.4s cubic-bezier(0.64, 0, 0.78, 0)';
+  textInput.style.transform = 'scaleY(0.1) translateY(-20px)';
+  textInput.style.opacity = '0';
+  textInput.style.filter = 'blur(10px)';
+  
   try{
     const res = await fetch('/api/text', {
       method:'POST',
@@ -113,13 +120,28 @@ async function shareText(){
       body:JSON.stringify({content})
     });
     if(res.ok) {
-        textInput.value = '';
+        // Wait for animation to finish before clearing
+        setTimeout(() => {
+          textInput.value = '';
+          textInput.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+          textInput.style.transform = 'scaleY(1) translateY(0)';
+          textInput.style.opacity = '1';
+          textInput.style.filter = 'none';
+        }, 400);
+        
         const newItem = await res.json();
-        // If we didn't have myIp yet, set it now
         if (!myIp) myIp = newItem.roomId;
+    } else {
+      // Reset if failed
+      textInput.style.transform = 'none';
+      textInput.style.opacity = '1';
+      textInput.style.filter = 'none';
     }
   }catch(err){
     console.error('Failed to share text:', err);
+    textInput.style.transform = 'none';
+    textInput.style.opacity = '1';
+    textInput.style.filter = 'none';
   }finally{ shareTextBtn.disabled = false; }
 }
 
@@ -187,14 +209,27 @@ document.addEventListener('dragover',(e)=>{ e.preventDefault(); });
 document.addEventListener('drop',(e)=>{ e.preventDefault(); dragCounter=0; dragOverlay.classList.add('hidden'); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
 
 function renderItems(newItems){
+  const oldItems = [...items];
   if(newItems !== undefined) items = newItems;
   itemCount.textContent = items.length ? `(${items.length})` : '';
   emptyState.classList.toggle('hidden', items.length > 0);
-  itemsGrid.innerHTML = items.map(item => {
-    if(item.type === 'text') return renderTextCard(item);
-    if(item.type === 'file') return renderFileCard(item);
-    return '';
+  
+  // Identify added items for animation
+  const oldIds = new Set(oldItems.map(i => i.id));
+  const newIds = new Set(items.map(i => i.id));
+  
+  const html = items.map(item => {
+    const isNew = !oldIds.has(item.id);
+    const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
+    
+    // Inject custom animation style if new
+    if(isNew) {
+      return cardHtml.replace('class="item-card', 'style="animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;" class="item-card');
+    }
+    return cardHtml;
   }).join('');
+  
+  itemsGrid.innerHTML = html;
 }
 
 function renderTextCard(item){
