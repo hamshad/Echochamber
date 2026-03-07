@@ -439,11 +439,12 @@ modalSaveBtn.addEventListener('click', saveModalText);
 function enterEditMode(){
   const preview = document.getElementById('modal-preview');
   const body = document.querySelector('.text-modal-body');
-  // Replace preview with textarea
+  // Replace preview with textarea but keep same sizing
   body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
   const ta = document.getElementById('modal-textarea');
+  ta.style.height = '100%';
+  ta.style.boxSizing = 'border-box';
   ta.value = preview ? preview.textContent : '';
-  ta.style.display = 'block';
   ta.focus();
   modalSaveBtn.disabled = false;
 }

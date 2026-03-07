@@ -257,10 +257,11 @@ textarea:focus {
 .text-modal { position: fixed; inset: 0; display:flex;align-items:center;justify-content:center;z-index:2000 }
 .text-modal.hidden{ display:none }
 .text-modal-backdrop{ position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px); }
-.text-modal-panel{ position:relative;width:min(1140px,calc(100% - 48px));height:min(88vh,900px);background:var(--bg-secondary);border-radius:12px;padding:1rem;box-shadow:0 24px 120px rgba(0,0,0,0.6);transform:translateY(20px) scale(0.98);opacity:0;animation:modalIn .36s cubic-bezier(0.22,1,0.36,1) forwards }
+.text-modal-panel{ position:relative;width:min(1140px,calc(100% - 48px));height:min(88vh,900px);background:var(--bg-secondary);border-radius:12px;padding:1rem;box-shadow:0 24px 120px rgba(0,0,0,0.6);transform:translateY(20px) scale(0.98);opacity:0;animation:modalIn .36s cubic-bezier(0.22,1,0.36,1) forwards;display:flex;flex-direction:column}
 .text-modal-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:0.5rem}
-.text-modal-body textarea{width:100%;height:calc(100% - 120px);padding:1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);resize:vertical;font-family:'SF Mono','Fira Code',monospace}
-.text-modal-body .preview{width:100%;height:calc(100% - 120px);padding:1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);overflow:auto;font-family:'SF Mono','Fira Code',monospace;white-space:pre-wrap}
+.text-modal-body{flex:1;display:flex;flex-direction:column;min-height:0}
+.text-modal-body textarea{width:100%;padding:1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);resize:vertical;font-family:'SF Mono','Fira Code',monospace;flex:1;min-height:0;overflow:auto}
+.text-modal-body .preview{width:100%;padding:1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);overflow:auto;font-family:'SF Mono','Fira Code',monospace;white-space:pre-wrap;word-break:break-word;flex:1;min-height:0}
 .text-modal-actions{display:flex;gap:0.5rem}
 .text-modal-footer{margin-top:0.5rem;color:var(--text-tertiary);font-size:0.9rem}
 
