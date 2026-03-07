@@ -1,12 +1,8 @@
 // public/app.js — main client script for Echochamber
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, query, orderByChild } from 'firebase/database';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
 
-// Firebase configuration (fetch from server to keep it dynamic if needed, 
-// but since we're using Realtime DB, we'll need these public keys)
-// For now, we'll hardcode the known config, or fetch from a small endpoint.
 let db;
-
 let items = [];
 
 const textInput = document.getElementById('text-input');
@@ -44,7 +40,6 @@ async function getMyIp() {
 }
 
 async function initFirebase() {
-  // We'll use the same project ID and DB URL as the server
   const firebaseConfig = {
     databaseURL: "https://rnfirebase-c3268-default-rtdb.firebaseio.com",
     projectId: "rnfirebase-c3268"
@@ -57,13 +52,9 @@ async function initFirebase() {
   console.log('Detected Room IP:', myIp);
   
   const itemsRef = ref(db, 'items');
-  // Listen for changes
   onValue(itemsRef, (snapshot) => {
     const data = snapshot.val() || {};
     const allItems = Object.values(data);
-    
-    // Filter by IP (Room Scoping) and expiry locally for immediate updates
-    // while the server also handles the same logic.
     const now = Date.now();
     items = allItems
       .filter(i => i.expiresAt > now && (i.roomId === myIp))
@@ -126,8 +117,6 @@ async function uploadFiles(files){
     showProgress(`Uploading ${file.name}...`);
     const formData = new FormData();
     formData.append('file', file);
-    
-    // Optimistic UI: create a temporary client-side card immediately so uploader sees feedback
     const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
     items = [{
       id: optimisticId,
