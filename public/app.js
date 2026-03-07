@@ -393,7 +393,9 @@ window.openTextModal = function(id){
   modalEditingId = id;
   // Ensure the textarea exists but hide it; we'll show preview by default
   modalTextarea = document.getElementById('modal-textarea');
-  modalTextarea.style.display = 'none';
+  if (modalTextarea) {
+    try { modalTextarea.style.display = 'none'; } catch (e) { /* ignore if removed */ }
+  }
   const body = document.querySelector('.text-modal-body');
   body.innerHTML = '';
   const preview = document.createElement('div');
@@ -406,6 +408,12 @@ window.openTextModal = function(id){
 }
 
 function closeTextModal(){
+  // Reset modal content to default textarea placeholder so next open is consistent
+  const body = document.querySelector('.text-modal-body');
+  if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
+  // reset buttons and state
+  if (modalCopyBtn) modalCopyBtn.textContent = '📋';
+  if (modalSaveBtn) modalSaveBtn.disabled = true;
   textModal.classList.add('hidden');
   modalEditingId = null;
 }
