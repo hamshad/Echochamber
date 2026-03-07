@@ -122,6 +122,40 @@ app.get('/api/items', async (req, res) => {
   res.json(await getActiveItems(roomId));
 });
 
+// GET /api/cleanup
+// This is meant to be called by a Vercel Cron Job
+app.get('/api/cleanup', async (req, res) => {
+  // Optional: check for Vercel Cron secret header if configured
+  // if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+  //   return res.status(401).end();
+  // }
+  
+  console.log('[Cleanup] Manual trigger received');
+  const now = Date.now();
+  try {
+    const snapshot = await itemsRef.once('value');
+    const items = snapshot.val() || {};
+    let cleaned = 0;
+    for (const id in items) {
+      const item = items[id];
+      if (now > item.expiresAt) {
+        if (item.type === 'file' && item.filename) {
+          bucket.file(item.filename).delete().catch((err) => {
+            if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
+          });
+        }
+        await itemsRef.child(id).remove();
+        cleaned++;
+      }
+    }
+    console.log(`[Cleanup] Successfully removed ${cleaned} expired item(s)`);
+    return res.json({ success: true, cleaned });
+  } catch (err) {
+    console.error('[Cleanup] Failed:', err.message);
+    return res.status(500).json({ error: 'Cleanup failed' });
+  }
+});
+
 // GET /api/whoami
 app.get('/api/whoami', (req, res) => {
   res.json({ ip: getRoomId(req) });
