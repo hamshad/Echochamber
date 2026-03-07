@@ -9,6 +9,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
+import { getDatabase } from 'firebase-admin/database';
 
 const PORT = process.env.PORT || 3000;
 const TTL = parseInt(process.env.TTL_MS, 10) || 60 * 60 * 1000; // 1 hour (configurable for tests)
@@ -35,25 +36,34 @@ try {
 }
 
 const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'rnfirebase-c3268.firebasestorage.app';
+const databaseURL = process.env.FIREBASE_DATABASE_URL || 'https://rnfirebase-c3268-default-rtdb.firebaseio.com';
+
 try {
+  const options = { storageBucket: bucketName, databaseURL };
   if (serviceAccount && Object.keys(serviceAccount).length) {
-    initializeApp({ credential: cert(serviceAccount), storageBucket: bucketName });
-  } else {
-    // initializeApp without explicit credential will let Firebase SDK attempt default credentials
-    initializeApp({ storageBucket: bucketName });
+    options.credential = cert(serviceAccount);
   }
+  initializeApp(options);
 } catch (e) {
   console.warn('[Startup] Firebase initializeApp warning:', e && e.message);
 }
+
 const bucket = getStorage().bucket();
+const db = getDatabase();
+const itemsRef = db.ref('items');
 
-const items = new Map();
-
-function getActiveItems(roomId) {
+async function getActiveItems(roomId) {
   const now = Date.now();
-  return Array.from(items.values())
-    .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
-    .sort((a, b) => b.createdAt - a.createdAt);
+  try {
+    const snapshot = await itemsRef.once('value');
+    const allItems = snapshot.val() || {};
+    return Object.values(allItems)
+      .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (err) {
+    console.error('[DB] Failed to fetch items:', err.message);
+    return [];
+  }
 }
 
 const app = express();
@@ -88,16 +98,15 @@ function normalizeIp(raw) {
 const upload = multer({ storage: multer.memoryStorage() });
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e9 });
 
 // API: GET /api/items
-app.get('/api/items', (req, res) => {
+app.get('/api/items', async (req, res) => {
   const roomId = getRoomId(req);
-  res.json(getActiveItems(roomId));
+  res.json(await getActiveItems(roomId));
 });
 
 // POST /api/text
-app.post('/api/text', (req, res) => {
+app.post('/api/text', async (req, res) => {
   const { content } = req.body || {};
   if (!content || typeof content !== 'string') {
     return res.status(400).json({ error: 'Content is required' });
@@ -117,29 +126,15 @@ app.post('/api/text', (req, res) => {
     createdAt: now,
     expiresAt: now + TTL
   };
-  items.set(id, item);
-  // Broadcast to the room
-  console.log(`[Broadcast] room=${item.roomId} id=${id}`);
-  io.to(item.roomId).emit('item:added', item);
-
-  // If uploader provided their socket id (multipart field `socketId`), ensure they get the event
+  
   try {
-    const uploaderSocketId = req.body && req.body.socketId;
-    if (uploaderSocketId) {
-      const sock = io.sockets.sockets.get(uploaderSocketId);
-      const inRoom = sock && sock.rooms && sock.rooms.has(item.roomId);
-      console.log(`[Upload] uploaderSocketId=${uploaderSocketId} socketFound=${!!sock} inRoom=${!!inRoom} room=${item.roomId}`);
-      if (sock && !inRoom) {
-        // Fallback direct emit to uploader socket
-        io.to(uploaderSocketId).emit('item:added', item);
-        console.log('[Upload] fallback emit to uploader socket id', uploaderSocketId);
-      }
-    }
-  } catch (e) {
-    // Non-fatal — continue
-    console.warn('[Upload] socket emit fallback failed:', e && e.message);
+    await itemsRef.child(id).set(item);
+    console.log(`[DB] Saved text room=${item.roomId} id=${id}`);
+    return res.status(201).json(item);
+  } catch (err) {
+    console.error('[DB] Save error:', err.message);
+    return res.status(500).json({ error: 'Failed to save item' });
   }
-  return res.status(201).json(item);
 });
 
 // POST /api/upload
@@ -173,84 +168,87 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     createdAt: now,
     expiresAt: now + TTL
   };
-  items.set(id, item);
-  io.to(item.roomId).emit('item:added', item);
-  return res.status(201).json(item);
+  
+  try {
+    await itemsRef.child(id).set(item);
+    console.log(`[DB] Saved file room=${item.roomId} id=${id}`);
+    return res.status(201).json(item);
+  } catch (err) {
+    console.error('[DB] Save error:', err.message);
+    return res.status(500).json({ error: 'Failed to save item metadata' });
+  }
 });
 
 // GET /api/download/:id
-app.get('/api/download/:id', (req, res) => {
+app.get('/api/download/:id', async (req, res) => {
   const id = req.params.id;
-  const item = items.get(id);
-  if (!item || item.expiresAt <= Date.now()) return res.status(404).json({ error: 'Not found' });
-  if (item.type !== 'file') return res.status(400).json({ error: 'Not a file item' });
+  try {
+    const snapshot = await itemsRef.child(id).once('value');
+    const item = snapshot.val();
+    if (!item || item.expiresAt <= Date.now()) return res.status(404).json({ error: 'Not found' });
+    if (item.type !== 'file') return res.status(400).json({ error: 'Not a file item' });
 
-  res.setHeader('Content-Disposition', `attachment; filename="${item.originalName}"`);
-  res.setHeader('Content-Type', item.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${item.originalName}"`);
+    res.setHeader('Content-Type', item.mimetype || 'application/octet-stream');
 
-  const fileRef = bucket.file(item.filename);
-  fileRef.createReadStream()
-    .on('error', (err) => {
-      console.error('[Download] Firebase read error:', err && err.message);
-      if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
-    })
-    .pipe(res);
+    const fileRef = bucket.file(item.filename);
+    fileRef.createReadStream()
+      .on('error', (err) => {
+        console.error('[Download] Firebase read error:', err && err.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
+      })
+      .pipe(res);
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // DELETE /api/items/:id
-app.delete('/api/items/:id', (req, res) => {
+app.delete('/api/items/:id', async (req, res) => {
   const id = req.params.id;
-  const item = items.get(id);
-  if (!item) return res.status(404).json({ error: 'Not found' });
-  const roomId = getRoomId(req);
-  if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const snapshot = await itemsRef.child(id).once('value');
+    const item = snapshot.val();
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    const roomId = getRoomId(req);
+    if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
 
-  if (item.type === 'file' && item.filename) {
-    bucket.file(item.filename).delete().catch((err) => {
-      // Ignore not-found errors
-      if (err && err.code !== 404) console.error('[Delete] Firebase delete error:', err && err.message);
-    });
+    if (item.type === 'file' && item.filename) {
+      bucket.file(item.filename).delete().catch((err) => {
+        // Ignore not-found errors
+        if (err && err.code !== 404) console.error('[Delete] Firebase delete error:', err && err.message);
+      });
+    }
+    await itemsRef.child(id).remove();
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Delete failed' });
   }
-  items.delete(id);
-  io.to(item.roomId).emit('item:removed', { id });
-  return res.json({ success: true });
-});
-
-// Socket.IO
-io.on('connection', (socket) => {
-  // Extract public IP from handshake headers (x-forwarded-for), fallback to socket address
-  const forwarded = socket.handshake.headers['x-forwarded-for'];
-  const raw = forwarded ? forwarded.split(',')[0].trim() : (socket.handshake.address || 'local');
-  const roomId = normalizeIp(raw);
-
-  socket.join(roomId);
-  console.log('[Socket.IO] Client connected:', socket.id, '→ room:', roomId);
-  socket.emit('items:sync', getActiveItems(roomId));
 });
 
 // Cleanup scheduler
-const cleanupTimer = setInterval(() => {
+const cleanupTimer = setInterval(async () => {
   const now = Date.now();
-  let cleaned = 0;
-  const affectedRooms = new Set();
-  for (const [id, item] of items) {
-    if (now > item.expiresAt) {
-      if (item.type === 'file' && item.filename) {
-        bucket.file(item.filename).delete().catch((err) => {
-          if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
-        });
+  try {
+    const snapshot = await itemsRef.once('value');
+    const items = snapshot.val() || {};
+    let cleaned = 0;
+    for (const id in items) {
+      const item = items[id];
+      if (now > item.expiresAt) {
+        if (item.type === 'file' && item.filename) {
+          bucket.file(item.filename).delete().catch((err) => {
+            if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
+          });
+        }
+        await itemsRef.child(id).remove();
+        cleaned++;
       }
-      affectedRooms.add(item.roomId);
-      items.delete(id);
-      cleaned++;
     }
+    if (cleaned > 0) console.log(`[Cleanup] Removed ${cleaned} expired item(s)`);
+  } catch (err) {
+    console.error('[Cleanup] Failed:', err.message);
   }
-    if (cleaned > 0) {
-      console.log(`[Cleanup] Removed ${cleaned} expired item(s)`);
-      for (const roomId of affectedRooms) {
-        io.to(roomId).emit('items:sync', getActiveItems(roomId));
-      }
-    }
 }, CLEANUP_INTERVAL);
 
 function getLocalIPs() {
@@ -269,7 +267,6 @@ function getLocalIPs() {
 function shutdown() {
   console.log('\n[Server] Shutting down...');
   clearInterval(cleanupTimer);
-  try { io.close(); } catch (e) {}
   server.close(() => {
     console.log('[Server] Goodbye!');
     process.exit(0);
@@ -299,4 +296,4 @@ if (isMainModule) {
 }
 
 // Exports for testing
-export { app, server, io, items, bucket, normalizeIp, getRoomId, getActiveItems, cleanupTimer, TTL, PORT };
+export { app, server, itemsRef as items, bucket, normalizeIp, getRoomId, getActiveItems, cleanupTimer, TTL, PORT };

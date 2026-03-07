@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Echochamber</title>
     <link rel="stylesheet" href="/style.css" />
-    <script src="/socket.io/socket.io.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+          "firebase/database": "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"
+        }
+      }
+    </script>
     <script src="/app.js" type="module" defer></script>
   </head>
   <body>

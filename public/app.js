@@ -1,5 +1,11 @@
 // public/app.js — main client script for Echochamber
-const socket = io();
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, onValue, query, orderByChild } from 'firebase/database';
+
+// Firebase configuration (fetch from server to keep it dynamic if needed, 
+// but since we're using Realtime DB, we'll need these public keys)
+// For now, we'll hardcode the known config, or fetch from a small endpoint.
+let db;
 
 let items = [];
 
@@ -26,22 +32,54 @@ function setStatusConnected(connected){
   }
 }
 
-socket.on('connect', () => setStatusConnected(true));
-socket.on('disconnect', () => setStatusConnected(false));
+// Helper: detect public IP for room scoping (matches server-side logic)
+async function getMyIp() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const data = await res.json();
+    return data.ip;
+  } catch (e) {
+    return 'local';
+  }
+}
 
-socket.on('items:sync', (data) => {
-  try { renderItems(data); } catch (e) { console.error(e); }
-});
+async function initFirebase() {
+  // We'll use the same project ID and DB URL as the server
+  const firebaseConfig = {
+    databaseURL: "https://rnfirebase-c3268-default-rtdb.firebaseio.com",
+    projectId: "rnfirebase-c3268"
+  };
 
-socket.on('item:added', (item) => {
-  // Replace any optimistic placeholder with the real item
-  items = [item, ...items.filter(i => !(i.optimistic && i.originalName === item.originalName && i.size === item.size))];
-  renderItems();
-});
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  
+  const myIp = await getMyIp();
+  console.log('Detected Room IP:', myIp);
+  
+  const itemsRef = ref(db, 'items');
+  // Listen for changes
+  onValue(itemsRef, (snapshot) => {
+    const data = snapshot.val() || {};
+    const allItems = Object.values(data);
+    
+    // Filter by IP (Room Scoping) and expiry locally for immediate updates
+    // while the server also handles the same logic.
+    const now = Date.now();
+    items = allItems
+      .filter(i => i.expiresAt > now && (i.roomId === myIp))
+      .sort((a, b) => b.createdAt - a.createdAt);
+    
+    renderItems();
+    setStatusConnected(true);
+  }, (error) => {
+    console.error('Firebase DB Error:', error);
+    setStatusConnected(false);
+  });
+}
 
-socket.on('item:removed', ({id}) => {
-  items = items.filter(i => i.id !== id);
-  renderItems();
+initFirebase().catch(err => {
+  console.error('Failed to init app:', err);
+  setStatusConnected(false);
 });
 
 shareTextBtn.addEventListener('click', shareText);
@@ -88,8 +126,7 @@ async function uploadFiles(files){
     showProgress(`Uploading ${file.name}...`);
     const formData = new FormData();
     formData.append('file', file);
-    // include this client's socket id so server can notify uploader immediately (handles some proxy cases)
-    if(socket && socket.id) formData.append('socketId', socket.id);
+    
     // Optimistic UI: create a temporary client-side card immediately so uploader sees feedback
     const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
     items = [{
@@ -207,6 +244,3 @@ function getTimeLeft(expiresAt){ const ms = expiresAt - Date.now(); if(ms<=0) re
 function formatSize(chars){ return typeof chars === 'number' ? chars.toLocaleString() : chars; }
 
 setInterval(()=>{ try{ renderItems(); }catch(e){} },30000);
-
-// initial fetch of items
-fetch('/api/items').then(r=>r.json()).then(data=>{ if(Array.isArray(data)) renderItems(data); }).catch(()=>{});
