@@ -4,6 +4,7 @@ import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11
 
 let db;
 let items = [];
+let myIp = null; // Will be set from server
 
 const textInput = document.getElementById('text-input');
 const shareTextBtn = document.getElementById('share-text-btn');
@@ -28,15 +29,23 @@ function setStatusConnected(connected){
   }
 }
 
-// Helper: detect public IP for room scoping (matches server-side logic)
+// Fetch our IP from our own server (most reliable way to match roomId)
 async function getMyIp() {
   try {
-    const res = await fetch('https://api.ipify.org?format=json');
-    const data = await res.json();
-    return data.ip;
+    const res = await fetch('/api/items');
+    // The server-side getRoomId is used when we call this endpoint.
+    // We can also just use the response from /api/text, but this is cleaner for init.
+    // However, the /api/items currently returns an array.
+    // Let's add a small health/info endpoint to the server for this.
+    const res2 = await fetch('/api/whoami');
+    if (res2.ok) {
+        const data = await res2.json();
+        return data.ip;
+    }
   } catch (e) {
-    return 'local';
+    console.warn('Could not fetch IP from /api/whoami, falling back to local');
   }
+  return 'local';
 }
 
 async function initFirebase() {
@@ -48,14 +57,16 @@ async function initFirebase() {
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   
-  const myIp = await getMyIp();
-  console.log('Detected Room IP:', myIp);
+  myIp = await getMyIp();
+  console.log('[App] Detected Room IP:', myIp);
   
   const itemsRef = ref(db, 'items');
   onValue(itemsRef, (snapshot) => {
     const data = snapshot.val() || {};
     const allItems = Object.values(data);
     const now = Date.now();
+    
+    // ROOM SCOPING: Match roomId exactly with what server detected
     items = allItems
       .filter(i => i.expiresAt > now && (i.roomId === myIp))
       .sort((a, b) => b.createdAt - a.createdAt);
@@ -93,7 +104,12 @@ async function shareText(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({content})
     });
-    if(res.ok) textInput.value = '';
+    if(res.ok) {
+        textInput.value = '';
+        const newItem = await res.json();
+        // If we didn't have myIp yet, set it now
+        if (!myIp) myIp = newItem.roomId;
+    }
   }catch(err){
     console.error('Failed to share text:', err);
   }finally{ shareTextBtn.disabled = false; }
@@ -125,7 +141,8 @@ async function uploadFiles(files){
       size: file.size,
       createdAt: Date.now(),
       expiresAt: Date.now() + 60*60*1000,
-      optimistic: true
+      optimistic: true,
+      roomId: myIp // Match current room for optimistic UI
     }, ...items];
     renderItems();
     try{
@@ -140,7 +157,11 @@ async function uploadFiles(files){
           }
         };
         xhr.onload = ()=>{
-          if(xhr.status>=200 && xhr.status<300) resolve();
+          if(xhr.status>=200 && xhr.status<300) {
+              const res = JSON.parse(xhr.responseText);
+              if (!myIp) myIp = res.roomId;
+              resolve();
+          }
           else reject(new Error(`Upload failed: ${xhr.status}`));
         };
         xhr.onerror = ()=>reject(new Error('Upload failed'));

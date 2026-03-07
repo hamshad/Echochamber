@@ -105,6 +105,11 @@ app.get('/api/items', async (req, res) => {
   res.json(await getActiveItems(roomId));
 });
 
+// GET /api/whoami
+app.get('/api/whoami', (req, res) => {
+  res.json({ ip: getRoomId(req) });
+});
+
 // POST /api/text
 app.post('/api/text', async (req, res) => {
   const { content } = req.body || {};
