@@ -230,19 +230,31 @@ function syncDom(oldItems, newItems) {
   const oldIds = new Set(oldItems.map(i => i.id));
   const newIds = new Set(newItems.map(i => i.id));
   
-  // Remove items that are no longer present
+  // Identify and Animate removals
   Array.from(itemsGrid.children).forEach(child => {
     const id = child.getAttribute('data-id');
-    if (!newIds.has(id)) {
-      child.style.transform = 'scale(0.8) translateY(20px)';
+    if (id && !newIds.has(id)) {
+      // Apply removal animation
+      child.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      child.style.transform = 'scale(0.5) translateY(20px)';
       child.style.opacity = '0';
-      setTimeout(() => child.remove(), 300);
+      child.style.pointerEvents = 'none';
+      
+      // We don't remove it yet - we wait for the transition
+      // But we mark it so we don't try to animate it again
+      child.setAttribute('data-removing', 'true');
     }
   });
 
+  // Small delay to let removal animation start before DOM cleanup
+  setTimeout(() => {
+    const removing = itemsGrid.querySelectorAll('[data-removing="true"]');
+    removing.forEach(el => el.remove());
+  }, 300);
+
   // Update or Add items
   newItems.forEach((item, index) => {
-    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]`);
+    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]:not([data-removing="true"])`);
     const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
     
     if (existing) {
