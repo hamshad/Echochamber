@@ -227,38 +227,47 @@ function renderItems(newItems){
 }
 
 function syncDom(oldItems, newItems) {
+  const oldIds = new Set(oldItems.map(i => i.id));
   const newIds = new Set(newItems.map(i => i.id));
   
-  // 1. Identify and remove cards that are no longer in the data
-  // EXCEPT for cards that we just optimistically started removing
-  const cards = Array.from(itemsGrid.children);
-  cards.forEach(card => {
-    const id = card.getAttribute('data-id');
-    const isRemoving = card.getAttribute('data-removing') === 'true';
-    
-    if (id && !newIds.has(id)) {
-      if (!isRemoving) {
-        // If it's gone from data but we didn't trigger an animation yet, just remove it
-        card.remove();
-      } else {
-        // If it's already "removing", we let the 400ms timeout handle its removal
-        // or wait for the next sync cycle.
-        setTimeout(() => {
-          if (card.parentNode) card.remove();
-        }, 500);
-      }
+  // Remove items that are no longer present
+  Array.from(itemsGrid.children).forEach(child => {
+    const id = child.getAttribute('data-id');
+    if (!newIds.has(id)) {
+      // If it's already marked as deleting, we let that animation handle it
+      if (child.classList.contains('deleting')) return;
+
+      child.style.transform = 'scale(0.8) translateY(20px)';
+      child.style.opacity = '0';
+      setTimeout(() => child.remove(), 300);
     }
   });
 
-  // 2. Add or Update items
+  // Update or Add items
   newItems.forEach((item, index) => {
     let existing = itemsGrid.querySelector(`[data-id="${item.id}"]`);
+    const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
     
-    if (!existing) {
-      const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
+    if (existing) {
+      // Update existing content if needed (e.g. time left)
+      // We do a lightweight update to avoid flickering
+      const footer = existing.querySelector('.item-footer');
+      if (footer) {
+        const timeLeft = getTimeLeft(item.expiresAt);
+        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+        footer.innerHTML = `
+          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
+        `;
+      }
+    } else {
+      // Create new element
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml.trim();
       const newElem = temp.firstChild;
+      
+      // Set view-transition-name for the browser to track this specific card
+      newElem.style.viewTransitionName = `card-${item.id}`;
       
       // If it's the very first render or we are adding to the top
       if (index === 0) {
@@ -272,51 +281,84 @@ function syncDom(oldItems, newItems) {
         }
       }
       
-      // Entrance animation
+      // Trigger entrance animation for new element
       newElem.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
-    } else {
-      // Update existing (time left)
-      const footer = existing.querySelector('.item-footer');
-      if (footer) {
-        const timeLeft = getTimeLeft(item.expiresAt);
-        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-        footer.innerHTML = `
-          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
-          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
-        `;
-      }
     }
   });
 }
 
+function renderTextCard(item){
+  const timeLeft = getTimeLeft(item.expiresAt);
+  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+  return `
+    <div class="item-card text" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+      <div class="item-header">
+        <span class="item-type text">📝 Text</span>
+        <div class="item-actions">
+          <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
+          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+        </div>
+      </div>
+      <div class="text-content">${escapeHtml(item.content)}</div>
+      <div class="item-footer">
+        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+        <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderFileCard(item){
+  const timeLeft = getTimeLeft(item.expiresAt);
+  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+  const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
+  return `
+    <div class="item-card file" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+      <div class="item-header">
+        <span class="item-type file">📎 File</span>
+        <div class="item-actions">
+          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+        </div>
+      </div>
+      <div class="file-name">${escapeHtml(item.originalName)}</div>
+      <div class="file-size">${formatFileSize(item.size)}</div>
+      <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')">⬇ Download</button>
+      ${optimisticNote}
+      <div class="item-footer">
+        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+      </div>
+    </div>
+  `;
+}
+
+window.copyText = async function(id){
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  try{ await navigator.clipboard.writeText(item.content); const btn = document.querySelector(`[data-id="${id}"] .btn-icon[title="Copy"]`); if(btn){ btn.textContent = '✓'; setTimeout(()=>btn.textContent='📋',1500); } }catch(err){ console.error('Copy failed:',err); }
+};
+
 window.deleteItem = async function(id){
   const card = document.querySelector(`[data-id="${id}"]`);
-  if (!card || card.getAttribute('data-removing') === 'true') return;
+  if (!card) return;
 
-  // 1. Mark as removing so syncDom doesn't interfere
-  card.setAttribute('data-removing', 'true');
+  // 1. Mark as deleting - make it transparent and unclickable
+  card.classList.add('deleting');
+  card.style.opacity = '0.5';
   card.style.pointerEvents = 'none';
-
-  // 2. Perform animation using View Transitions for the layout shift
-  if (document.startViewTransition) {
-    document.startViewTransition(() => {
-      card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-      card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
-      card.style.opacity = '0';
-      card.style.filter = 'blur(10px)';
-    });
-  } else {
-    card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-    card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
-    card.style.opacity = '0';
-    card.style.filter = 'blur(10px)';
-  }
+  card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
     
-    // Success: card will eventually be removed by the syncDom cleanup or timeout
+    // 2. Once API responds, do the "vanish" animation
+    // Note: The Firebase listener will soon call syncDom which will see 'deleting' class
+    // and wait for this animation to finish or let us handle it here.
+    card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
+    card.style.opacity = '0';
+    card.style.filter = 'blur(10px)';
+    
+    // We let the syncDom handle the actual removal, or we can clean up here
     setTimeout(() => {
       if (card.parentNode) card.remove();
     }, 450);
@@ -325,51 +367,11 @@ window.deleteItem = async function(id){
     alert('Unable to delete item. Please try again.');
     
     // Rollback
-    card.removeAttribute('data-removing');
+    card.classList.remove('deleting');
+    card.style.opacity = '1';
     card.style.pointerEvents = 'auto';
     card.style.transform = 'none';
-    card.style.opacity = '1';
     card.style.filter = 'none';
-  }
-};
-
-window.deleteItem = async function(id){
-  const card = document.querySelector(`[data-id="${id}"]`);
-  if (!card || card.getAttribute('data-removing') === 'true') return;
-
-  // 1. Start Optimistic Removal Animation immediately
-  card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-  card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
-  card.style.opacity = '0';
-  card.style.pointerEvents = 'none';
-  card.setAttribute('data-removing', 'true');
-
-  // Trigger a layout shift for other items immediately using View Transitions if available
-  if (document.startViewTransition) {
-    document.startViewTransition(() => {
-      // We don't remove from global 'items' array yet, but we want the DOM to shift
-      // For now, the CSS scale/opacity is enough to make it look "gone"
-    });
-  }
-
-  try {
-    // 2. Call the API in the background
-    const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
-    
-    if (!res.ok) {
-      throw new Error('Delete failed');
-    }
-    // Success: The Firebase onValue listener will eventually trigger renderItems() 
-    // and syncDom() which will officially remove the element from the DOM.
-  } catch (err) {
-    console.error('Delete failed:', err);
-    alert('Unable to delete item. Please try again.');
-    
-    // 3. Rollback: Reappear the item if the API fails
-    card.style.transform = 'none';
-    card.style.opacity = '1';
-    card.style.pointerEvents = 'auto';
-    card.removeAttribute('data-removing');
   }
 };
 
