@@ -88,10 +88,13 @@ async function initFirebase() {
   });
 }
 
-initFirebase().catch(err => {
+  initFirebase().catch(err => {
   console.error('Failed to init app:', err);
   setStatusConnected(false);
 });
+
+// Trigger lazy cleanup on init
+fetch('/api/cleanup').catch(() => {});
 
 shareTextBtn.addEventListener('click', shareText);
 textInput.addEventListener('keydown', (e) => {
