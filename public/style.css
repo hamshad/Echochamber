@@ -85,10 +85,6 @@ textarea:focus{border-color:var(--accent);outline:none}
 .empty-state .hint{font-size:.85rem;margin-top:.5rem}
 .empty-state.hidden{display:none}
 
-.sleepy-wrapper{display:flex;justify-content:center;margin-bottom:0.75rem}
-.sleepy-img{image-rendering:pixelated;transform-origin:center;animation:snore 2.8s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(99,102,241,0.25))}
-@keyframes snore{0%{transform:translateY(0)}25%{transform:translateY(-3px)}50%{transform:translateY(0)}75%{transform:translateY(-1px)}100%{transform:translateY(0)}}
-
 .hidden{display:none!important}
 
 @media(max-width:640px){#app{padding:1rem}.items-grid{grid-template-columns:1fr}h1{font-size:1.5rem}}
