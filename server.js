@@ -317,5 +317,7 @@ if (isMainModule) {
   });
 }
 
+export default app;
+
 // Exports for testing
-export { app, server, itemsRef as items, bucket, normalizeIp, getRoomId, getActiveItems, cleanupTimer, TTL, PORT };
+export { server, itemsRef as items, bucket, normalizeIp, getRoomId, getActiveItems, cleanupTimer, TTL, PORT };
