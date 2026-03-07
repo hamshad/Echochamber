@@ -36,6 +36,7 @@ try {
 }
 
 const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'rnfirebase-c3268.firebasestorage.app';
+// Database URL must include the full protocol https:// for Realtime DB to work
 const databaseURL = process.env.FIREBASE_DATABASE_URL || 'https://rnfirebase-c3268-default-rtdb.firebaseio.com';
 
 try {
@@ -43,9 +44,10 @@ try {
   if (serviceAccount && Object.keys(serviceAccount).length) {
     options.credential = cert(serviceAccount);
   }
+  console.log(`[Startup] Initializing Firebase: bucket=${bucketName}, db=${databaseURL}`);
   initializeApp(options);
 } catch (e) {
-  console.warn('[Startup] Firebase initializeApp warning:', e && e.message);
+  console.warn('[Startup] Firebase initializeApp error:', e && e.message);
 }
 
 const bucket = getStorage().bucket();
@@ -53,6 +55,39 @@ const db = getDatabase();
 const itemsRef = db.ref('items');
 
 async function getActiveItems(roomId) {
+  const now = Date.now();
+  console.log(`[DB] getActiveItems room=${roomId || 'all'}`);
+  try {
+    const snapshot = await itemsRef.once('value').catch(err => {
+      console.error('[DB] itemsRef.once failed:', err.message);
+      throw err;
+    });
+    const allItems = snapshot.val() || {};
+    return Object.values(allItems)
+      .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (err) {
+    console.error('[DB] Failed to fetch items:', err.message);
+    return [];
+  }
+}
+  initializeApp(options);
+} catch (e) {
+  console.warn('[Startup] Firebase initializeApp warning:', e && e.message);
+}
+
+const bucket = getStorage().bucket();
+let db;
+let itemsRef;
+try {
+  db = getDatabase();
+  itemsRef = db.ref('items');
+} catch (e) {
+  console.error('[Startup] Firebase Database init error:', e.message);
+}
+
+async function getActiveItems(roomId) {
+  if (!itemsRef) return [];
   const now = Date.now();
   try {
     const snapshot = await itemsRef.once('value');
