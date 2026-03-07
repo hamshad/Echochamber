@@ -227,33 +227,22 @@ function renderItems(newItems){
 }
 
 function syncDom(oldItems, newItems) {
-  const oldIds = new Set(oldItems.map(i => i.id));
   const newIds = new Set(newItems.map(i => i.id));
   
-  // Identify and Animate removals
+  // 1. Permanently remove elements that are gone and NOT currently animating
   Array.from(itemsGrid.children).forEach(child => {
     const id = child.getAttribute('data-id');
-    if (id && !newIds.has(id)) {
-      // Apply removal animation
-      child.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
-      child.style.transform = 'scale(0.5) translateY(20px)';
-      child.style.opacity = '0';
-      child.style.pointerEvents = 'none';
-      
-      // We don't remove it yet - we wait for the transition
-      // But we mark it so we don't try to animate it again
-      child.setAttribute('data-removing', 'true');
+    const isRemoving = child.getAttribute('data-removing') === 'true';
+    
+    // If it's truly gone from DB and we aren't waiting for a 300ms animation
+    if (id && !newIds.has(id) && !isRemoving) {
+      child.remove();
     }
   });
 
-  // Small delay to let removal animation start before DOM cleanup
-  setTimeout(() => {
-    const removing = itemsGrid.querySelectorAll('[data-removing="true"]');
-    removing.forEach(el => el.remove());
-  }, 300);
-
-  // Update or Add items
+  // 2. Update or Add items
   newItems.forEach((item, index) => {
+    // Only look for items that aren't being "eaten" or removed
     let existing = itemsGrid.querySelector(`[data-id="${item.id}"]:not([data-removing="true"])`);
     const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
     
@@ -347,7 +336,43 @@ window.copyText = async function(id){
 };
 
 window.deleteItem = async function(id){
-  try{ await fetch(`/api/items/${id}`,{method:'DELETE'}); }catch(err){ console.error('Delete failed:',err); }
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (!card || card.getAttribute('data-removing') === 'true') return;
+
+  // 1. Start Optimistic Removal Animation immediately
+  card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+  card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
+  card.style.opacity = '0';
+  card.style.pointerEvents = 'none';
+  card.setAttribute('data-removing', 'true');
+
+  // Trigger a layout shift for other items immediately using View Transitions if available
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      // We don't remove from global 'items' array yet, but we want the DOM to shift
+      // For now, the CSS scale/opacity is enough to make it look "gone"
+    });
+  }
+
+  try {
+    // 2. Call the API in the background
+    const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+    
+    if (!res.ok) {
+      throw new Error('Delete failed');
+    }
+    // Success: The Firebase onValue listener will eventually trigger renderItems() 
+    // and syncDom() which will officially remove the element from the DOM.
+  } catch (err) {
+    console.error('Delete failed:', err);
+    alert('Unable to delete item. Please try again.');
+    
+    // 3. Rollback: Reappear the item if the API fails
+    card.style.transform = 'none';
+    card.style.opacity = '1';
+    card.style.pointerEvents = 'auto';
+    card.removeAttribute('data-removing');
+  }
 };
 
 window.downloadFile = function(id){ window.open(`/api/download/${id}`,'_blank'); };
