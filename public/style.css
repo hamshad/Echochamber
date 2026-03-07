@@ -252,3 +252,15 @@ textarea:focus {
 }
 
 /* End of additional styles */
+
+/* Text modal styles */
+.text-modal { position: fixed; inset: 0; display:flex;align-items:center;justify-content:center;z-index:2000 }
+.text-modal.hidden{ display:none }
+.text-modal-backdrop{ position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px); }
+.text-modal-panel{ position:relative;width:min(880px,calc(100% - 40px));background:var(--bg-secondary);border-radius:12px;padding:1rem;box-shadow:0 24px 80px rgba(0,0,0,0.6);transform:translateY(20px) scale(0.98);opacity:0;animation:modalIn .36s cubic-bezier(0.22,1,0.36,1) forwards }
+.text-modal-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:0.5rem}
+.text-modal-body textarea{width:100%;height:320px;padding:1rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);resize:vertical;font-family:'SF Mono','Fira Code',monospace}
+.text-modal-actions{display:flex;gap:0.5rem}
+.text-modal-footer{margin-top:0.5rem;color:var(--text-tertiary);font-size:0.9rem}
+
+@keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}

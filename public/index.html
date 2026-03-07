@@ -72,6 +72,25 @@
           <p>Drop files to share</p>
         </div>
       </div>
+      <!-- Text preview / edit modal -->
+      <div id="text-modal" class="text-modal hidden" role="dialog" aria-modal="true" aria-labelledby="text-modal-title">
+        <div class="text-modal-backdrop"></div>
+        <div class="text-modal-panel" role="document">
+          <header class="text-modal-header">
+            <h3 id="text-modal-title">View & Edit Text</h3>
+            <div class="text-modal-actions">
+              <button id="modal-copy-btn" class="btn btn-icon" title="Copy">📋</button>
+              <button id="modal-format-btn" class="btn btn-icon" title="Format">🧹</button>
+              <button id="modal-save-btn" class="btn btn-primary">Save</button>
+              <button id="modal-close-btn" class="btn btn-icon" title="Close">✕</button>
+            </div>
+          </header>
+          <main class="text-modal-body">
+            <textarea id="modal-textarea" rows="12"></textarea>
+          </main>
+          <footer class="text-modal-footer muted">You can edit, format, copy or save back to the shared list.</footer>
+        </div>
+      </div>
     </div>
   </body>
 </html>

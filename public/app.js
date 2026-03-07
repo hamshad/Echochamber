@@ -296,6 +296,7 @@ function renderTextCard(item){
         <span class="item-type text">📝 Text</span>
         <div class="item-actions">
           <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
+          <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View">👁</button>
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
       </div>
@@ -376,6 +377,49 @@ window.deleteItem = async function(id){
 };
 
 window.downloadFile = function(id){ window.open(`/api/download/${id}`,'_blank'); };
+
+// Modal handling
+const textModal = document.getElementById('text-modal');
+const modalTextarea = document.getElementById('modal-textarea');
+const modalCloseBtn = document.getElementById('modal-close-btn');
+const modalSaveBtn = document.getElementById('modal-save-btn');
+const modalCopyBtn = document.getElementById('modal-copy-btn');
+const modalFormatBtn = document.getElementById('modal-format-btn');
+let modalEditingId = null;
+
+window.openTextModal = function(id){
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  modalEditingId = id;
+  modalTextarea.value = item.content || '';
+  textModal.classList.remove('hidden');
+  modalTextarea.focus();
+}
+
+function closeTextModal(){
+  textModal.classList.add('hidden');
+  modalEditingId = null;
+}
+
+modalCloseBtn.addEventListener('click', closeTextModal);
+modalCopyBtn.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(modalTextarea.value); modalCopyBtn.textContent = '✓'; setTimeout(()=>modalCopyBtn.textContent='📋',1200); }catch(e){console.error(e)} });
+modalFormatBtn.addEventListener('click', ()=>{ // simple formatting: trim and normalize line endings
+  modalTextarea.value = modalTextarea.value.replace(/\r\n/g,'\n').trim();
+});
+
+modalSaveBtn.addEventListener('click', async ()=>{
+  if(!modalEditingId) return;
+  const updated = modalTextarea.value;
+  try{
+    const res = await fetch('/api/text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: updated }) });
+    // naive approach: create a new item with updated text and delete old one
+    if(res.ok){
+      // delete old
+      await fetch(`/api/items/${modalEditingId}`, { method: 'DELETE' }).catch(()=>{});
+      closeTextModal();
+    }
+  }catch(e){ console.error('Save text failed', e); }
+});
 
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
 
