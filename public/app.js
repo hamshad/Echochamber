@@ -212,31 +212,83 @@ function renderItems(newItems){
   const oldItems = [...items];
   if(newItems !== undefined) items = newItems;
   itemCount.textContent = items.length ? `(${items.length})` : '';
-  emptyState.classList.toggle('hidden', items.length > 0);
   
-  // Identify added items for animation
+  const hasItems = items.length > 0;
+  emptyState.classList.toggle('hidden', hasItems);
+  
+  // Use View Transitions API if available for smooth layout morphing
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      syncDom(oldItems, items);
+    });
+  } else {
+    syncDom(oldItems, items);
+  }
+}
+
+function syncDom(oldItems, newItems) {
   const oldIds = new Set(oldItems.map(i => i.id));
-  const newIds = new Set(items.map(i => i.id));
+  const newIds = new Set(newItems.map(i => i.id));
   
-  const html = items.map(item => {
-    const isNew = !oldIds.has(item.id);
+  // Remove items that are no longer present
+  Array.from(itemsGrid.children).forEach(child => {
+    const id = child.getAttribute('data-id');
+    if (!newIds.has(id)) {
+      child.style.transform = 'scale(0.8) translateY(20px)';
+      child.style.opacity = '0';
+      setTimeout(() => child.remove(), 300);
+    }
+  });
+
+  // Update or Add items
+  newItems.forEach((item, index) => {
+    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]`);
     const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
     
-    // Inject custom animation style if new
-    if(isNew) {
-      return cardHtml.replace('class="item-card', 'style="animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;" class="item-card');
+    if (existing) {
+      // Update existing content if needed (e.g. time left)
+      // We do a lightweight update to avoid flickering
+      const footer = existing.querySelector('.item-footer');
+      if (footer) {
+        const timeLeft = getTimeLeft(item.expiresAt);
+        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+        footer.innerHTML = `
+          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
+        `;
+      }
+    } else {
+      // Create new element
+      const temp = document.createElement('div');
+      temp.innerHTML = cardHtml.trim();
+      const newElem = temp.firstChild;
+      
+      // Set view-transition-name for the browser to track this specific card
+      newElem.style.viewTransitionName = `card-${item.id}`;
+      
+      // If it's the very first render or we are adding to the top
+      if (index === 0) {
+        itemsGrid.prepend(newElem);
+      } else {
+        const children = itemsGrid.children;
+        if (children[index]) {
+          itemsGrid.insertBefore(newElem, children[index]);
+        } else {
+          itemsGrid.appendChild(newElem);
+        }
+      }
+      
+      // Trigger entrance animation for new element
+      newElem.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
     }
-    return cardHtml;
-  }).join('');
-  
-  itemsGrid.innerHTML = html;
+  });
 }
 
 function renderTextCard(item){
   const timeLeft = getTimeLeft(item.expiresAt);
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   return `
-    <div class="item-card text" data-id="${item.id}">
+    <div class="item-card text" data-id="${item.id}" style="view-transition-name: card-${item.id}">
       <div class="item-header">
         <span class="item-type text">📝 Text</span>
         <div class="item-actions">
@@ -258,7 +310,7 @@ function renderFileCard(item){
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
   return `
-    <div class="item-card file" data-id="${item.id}">
+    <div class="item-card file" data-id="${item.id}" style="view-transition-name: card-${item.id}">
       <div class="item-header">
         <span class="item-type file">📎 File</span>
         <div class="item-actions">
