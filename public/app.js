@@ -419,6 +419,23 @@ modalSaveBtn.addEventListener('click', async ()=>{
   }catch(e){ console.error('Save text failed', e); }
 });
 
+// Keyboard shortcuts: Esc to close, Ctrl/Cmd+S to save, Ctrl/Cmd+C to copy
+document.addEventListener('keydown', (e)=>{
+  if (textModal.classList.contains('hidden')) return;
+  if (e.key === 'Escape') { closeTextModal(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    modalSaveBtn.click();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+    // If textarea focused, let native copy; otherwise trigger copy
+    if (document.activeElement !== modalTextarea) {
+      e.preventDefault();
+      modalCopyBtn.click();
+    }
+  }
+});
+
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
 
 function formatFileSize(bytes){ if(!bytes) return '0 B'; const units=['B','KB','MB','GB']; const i=Math.floor(Math.log(bytes)/Math.log(1024)); return (bytes/Math.pow(1024,i)).toFixed(i===0?0:1)+' '+units[i]; }
