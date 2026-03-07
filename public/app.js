@@ -61,13 +61,9 @@ async function initFirebase() {
   myIp = await getMyIp();
   console.log('[App] Detected Room IP:', myIp);
   
-  // Show loading state while waiting for the first value
-  loadingState.classList.remove('hidden');
-  emptyState.classList.add('hidden');
-  itemsGrid.classList.add('hidden');
-  
   const itemsRef = ref(db, 'items');
   onValue(itemsRef, (snapshot) => {
+    // Hide loading once we get any value from Firebase
     loadingState.classList.add('hidden');
     itemsGrid.classList.remove('hidden');
     
