@@ -280,7 +280,8 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 // Only start listening when run directly (not when imported by tests)
-const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+// Vercel sets process.env.VERCEL, and usually runs the script via its own runner.
+const isMainModule = (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) || process.env.VERCEL;
 if (isMainModule) {
   server.listen(PORT, () => {
     console.log('\n' + '═'.repeat(50));
