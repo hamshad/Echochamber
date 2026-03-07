@@ -229,43 +229,36 @@ function renderItems(newItems){
 function syncDom(oldItems, newItems) {
   const newIds = new Set(newItems.map(i => i.id));
   
-  // 1. Permanently remove elements that are gone and NOT currently animating
-  Array.from(itemsGrid.children).forEach(child => {
-    const id = child.getAttribute('data-id');
-    const isRemoving = child.getAttribute('data-removing') === 'true';
+  // 1. Identify and remove cards that are no longer in the data
+  // EXCEPT for cards that we just optimistically started removing
+  const cards = Array.from(itemsGrid.children);
+  cards.forEach(card => {
+    const id = card.getAttribute('data-id');
+    const isRemoving = card.getAttribute('data-removing') === 'true';
     
-    // If it's truly gone from DB and we aren't waiting for a 300ms animation
-    if (id && !newIds.has(id) && !isRemoving) {
-      child.remove();
+    if (id && !newIds.has(id)) {
+      if (!isRemoving) {
+        // If it's gone from data but we didn't trigger an animation yet, just remove it
+        card.remove();
+      } else {
+        // If it's already "removing", we let the 400ms timeout handle its removal
+        // or wait for the next sync cycle.
+        setTimeout(() => {
+          if (card.parentNode) card.remove();
+        }, 500);
+      }
     }
   });
 
-  // 2. Update or Add items
+  // 2. Add or Update items
   newItems.forEach((item, index) => {
-    // Only look for items that aren't being "eaten" or removed
-    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]:not([data-removing="true"])`);
-    const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
+    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]`);
     
-    if (existing) {
-      // Update existing content if needed (e.g. time left)
-      // We do a lightweight update to avoid flickering
-      const footer = existing.querySelector('.item-footer');
-      if (footer) {
-        const timeLeft = getTimeLeft(item.expiresAt);
-        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-        footer.innerHTML = `
-          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
-          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
-        `;
-      }
-    } else {
-      // Create new element
+    if (!existing) {
+      const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml.trim();
       const newElem = temp.firstChild;
-      
-      // Set view-transition-name for the browser to track this specific card
-      newElem.style.viewTransitionName = `card-${item.id}`;
       
       // If it's the very first render or we are adding to the top
       if (index === 0) {
@@ -279,60 +272,65 @@ function syncDom(oldItems, newItems) {
         }
       }
       
-      // Trigger entrance animation for new element
+      // Entrance animation
       newElem.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+    } else {
+      // Update existing (time left)
+      const footer = existing.querySelector('.item-footer');
+      if (footer) {
+        const timeLeft = getTimeLeft(item.expiresAt);
+        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+        footer.innerHTML = `
+          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
+        `;
+      }
     }
   });
 }
 
-function renderTextCard(item){
-  const timeLeft = getTimeLeft(item.expiresAt);
-  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-  return `
-    <div class="item-card text" data-id="${item.id}" style="view-transition-name: card-${item.id}">
-      <div class="item-header">
-        <span class="item-type text">📝 Text</span>
-        <div class="item-actions">
-          <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
-          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
-        </div>
-      </div>
-      <div class="text-content">${escapeHtml(item.content)}</div>
-      <div class="item-footer">
-        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
-        <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
-      </div>
-    </div>
-  `;
-}
+window.deleteItem = async function(id){
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (!card || card.getAttribute('data-removing') === 'true') return;
 
-function renderFileCard(item){
-  const timeLeft = getTimeLeft(item.expiresAt);
-  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-  const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
-  return `
-    <div class="item-card file" data-id="${item.id}" style="view-transition-name: card-${item.id}">
-      <div class="item-header">
-        <span class="item-type file">📎 File</span>
-        <div class="item-actions">
-          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
-        </div>
-      </div>
-      <div class="file-name">${escapeHtml(item.originalName)}</div>
-      <div class="file-size">${formatFileSize(item.size)}</div>
-      <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')">⬇ Download</button>
-      ${optimisticNote}
-      <div class="item-footer">
-        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
-      </div>
-    </div>
-  `;
-}
+  // 1. Mark as removing so syncDom doesn't interfere
+  card.setAttribute('data-removing', 'true');
+  card.style.pointerEvents = 'none';
 
-window.copyText = async function(id){
-  const item = items.find(i => i.id === id);
-  if(!item) return;
-  try{ await navigator.clipboard.writeText(item.content); const btn = document.querySelector(`[data-id="${id}"] .btn-icon[title="Copy"]`); if(btn){ btn.textContent = '✓'; setTimeout(()=>btn.textContent='📋',1500); } }catch(err){ console.error('Copy failed:',err); }
+  // 2. Perform animation using View Transitions for the layout shift
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
+      card.style.opacity = '0';
+      card.style.filter = 'blur(10px)';
+    });
+  } else {
+    card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
+    card.style.opacity = '0';
+    card.style.filter = 'blur(10px)';
+  }
+
+  try {
+    const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    
+    // Success: card will eventually be removed by the syncDom cleanup or timeout
+    setTimeout(() => {
+      if (card.parentNode) card.remove();
+    }, 450);
+  } catch (err) {
+    console.error('Delete failed:', err);
+    alert('Unable to delete item. Please try again.');
+    
+    // Rollback
+    card.removeAttribute('data-removing');
+    card.style.pointerEvents = 'auto';
+    card.style.transform = 'none';
+    card.style.opacity = '1';
+    card.style.filter = 'none';
+  }
 };
 
 window.deleteItem = async function(id){
