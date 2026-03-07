@@ -403,9 +403,7 @@ function closeTextModal(){
 
 modalCloseBtn.addEventListener('click', closeTextModal);
 modalCopyBtn.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(modalTextarea.value); modalCopyBtn.textContent = '✓'; setTimeout(()=>modalCopyBtn.textContent='📋',1200); }catch(e){console.error(e)} });
-modalFormatBtn.addEventListener('click', ()=>{ // simple formatting: trim and normalize line endings
-  modalTextarea.value = modalTextarea.value.replace(/\r\n/g,'\n').trim();
-});
+// Removed formatting button; no-op kept for backward compatibility
 
 modalSaveBtn.addEventListener('click', async ()=>{
   if(!modalEditingId) return;
