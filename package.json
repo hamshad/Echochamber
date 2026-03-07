@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test tests/unit.test.js tests/integration.test.js tests/e2e.test.js"
   },
   "dependencies": {
     "express": "^4.21.0",
@@ -13,5 +13,8 @@
     "multer": "^1.4.5-lts.1",
     "socket.io": "^4.8.0",
     "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }

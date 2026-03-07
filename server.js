@@ -11,8 +11,8 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 
 const PORT = process.env.PORT || 3000;
-const TTL = 60 * 60 * 1000; // 1 hour
-const CLEANUP_INTERVAL = 60 * 1000; // 60 seconds
+const TTL = parseInt(process.env.TTL_MS, 10) || 60 * 60 * 1000; // 1 hour (configurable for tests)
+const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL_MS, 10) || 60 * 1000; // 60 seconds
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -220,7 +220,8 @@ app.delete('/api/items/:id', (req, res) => {
 io.on('connection', (socket) => {
   // Extract public IP from handshake headers (x-forwarded-for), fallback to socket address
   const forwarded = socket.handshake.headers['x-forwarded-for'];
-  const roomId = forwarded ? forwarded.split(',')[0].trim() : (socket.handshake.address || 'local');
+  const raw = forwarded ? forwarded.split(',')[0].trim() : (socket.handshake.address || 'local');
+  const roomId = normalizeIp(raw);
 
   socket.join(roomId);
   console.log('[Socket.IO] Client connected:', socket.id, '→ room:', roomId);
@@ -278,14 +279,21 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-server.listen(PORT, () => {
-  console.log('\n' + '═'.repeat(50));
-  console.log('  🔗 Echochamber is running!\n');
-  console.log(`  Local:   http://localhost:${PORT}`);
-  for (const ip of getLocalIPs()) {
-    console.log(`  Network: http://${ip.address}:${PORT}  (${ip.name})`);
-  }
-  console.log('\n  Share the Network URL with anyone on your WiFi');
-  console.log('  Items auto-delete after 1 hour');
-  console.log('═'.repeat(50) + '\n');
-});
+// Only start listening when run directly (not when imported by tests)
+const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMainModule) {
+  server.listen(PORT, () => {
+    console.log('\n' + '═'.repeat(50));
+    console.log('  🔗 Echochamber is running!\n');
+    console.log(`  Local:   http://localhost:${PORT}`);
+    for (const ip of getLocalIPs()) {
+      console.log(`  Network: http://${ip.address}:${PORT}  (${ip.name})`);
+    }
+    console.log('\n  Share the Network URL with anyone on your WiFi');
+    console.log('  Items auto-delete after 1 hour');
+    console.log('═'.repeat(50) + '\n');
+  });
+}
+
+// Exports for testing
+export { app, server, io, items, bucket, normalizeIp, getRoomId, getActiveItems, cleanupTimer, TTL, PORT };
