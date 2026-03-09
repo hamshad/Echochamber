@@ -235,6 +235,73 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// POST /api/signed-upload
+// Returns a signed URL clients can PUT to directly (avoids sending large payloads through Vercel)
+app.post('/api/signed-upload', async (req, res) => {
+  try {
+    const { originalName, contentType } = req.body || {};
+    if (!originalName || !contentType) return res.status(400).json({ error: 'originalName and contentType are required' });
+
+    const roomId = getRoomId(req);
+    const id = uuidv4();
+    const ext = path.extname(originalName) || '';
+    const storageName = `uploads/${roomId}/${id}${ext}`;
+    const fileRef = bucket.file(storageName);
+
+    // Create a V4 signed URL for PUT/WRITE. Expires in 15 minutes by default.
+    const expiresMs = (parseInt(process.env.SIGNED_URL_EXPIRES_MS, 10) || 15 * 60 * 1000);
+    const [url] = await fileRef.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + expiresMs,
+      contentType
+    });
+
+    return res.json({ url, storageName, expiresInMs: expiresMs });
+  } catch (err) {
+    console.error('[SignedUpload] Error creating signed URL:', err && err.message);
+    return res.status(500).json({ error: 'Failed to create signed upload URL' });
+  }
+});
+
+// POST /api/complete-upload
+// Called by client after successful direct upload to register metadata in Realtime DB
+app.post('/api/complete-upload', express.json(), async (req, res) => {
+  try {
+    const { storageName, originalName, size, mimetype } = req.body || {};
+    if (!storageName || !originalName) return res.status(400).json({ error: 'storageName and originalName are required' });
+
+    const roomId = getRoomId(req);
+
+    // Validate storageName belongs to this room (security check)
+    if (!storageName.startsWith(`uploads/${roomId}/`)) {
+      return res.status(400).json({ error: 'Invalid storage path for this room' });
+    }
+
+    const id = uuidv4();
+    const now = Date.now();
+    const item = {
+      id,
+      type: 'file',
+      roomId,
+      content: null,
+      filename: storageName,
+      originalName,
+      mimetype: mimetype || 'application/octet-stream',
+      size: typeof size === 'number' ? size : null,
+      createdAt: now,
+      expiresAt: now + TTL
+    };
+
+    await itemsRef.child(id).set(item);
+    console.log(`[DB] Registered uploaded file room=${roomId} id=${id} file=${storageName}`);
+    return res.status(201).json(item);
+  } catch (err) {
+    console.error('[CompleteUpload] Error registering upload:', err && err.message);
+    return res.status(500).json({ error: 'Failed to register uploaded file' });
+  }
+});
+
 // GET /api/download/:id
 app.get('/api/download/:id', async (req, res) => {
   const id = req.params.id;
