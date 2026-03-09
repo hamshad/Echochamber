@@ -1,8 +1,6 @@
 // public/app.js — main client script for Echochamber
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
 import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
-import { getAuth, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js';
 
 let db;
 let items = [];
@@ -59,8 +57,6 @@ async function initFirebase() {
 
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
-  const auth = getAuth(app);
-  const storage = getStorage(app);
   
   myIp = await getMyIp();
   console.log('[App] Detected Room IP:', myIp);
@@ -163,10 +159,10 @@ function hideProgress(){
 }
 
 async function uploadFiles(files){
-  // New flow: obtain a short-lived server token, sign-in the Firebase client with it,
-  // then use the Firebase Storage client SDK (uploadBytesResumable) to upload large files.
   for(const file of files){
     showProgress(`Uploading ${file.name}...`);
+    const formData = new FormData();
+    formData.append('file', file);
     const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
     items = [{
       id: optimisticId,
@@ -179,44 +175,29 @@ async function uploadFiles(files){
       roomId: myIp // Match current room for optimistic UI
     }, ...items];
     renderItems();
-
     try{
-      // 1) Create a short-lived custom token from the server
-      const tokenRes = await fetch('/api/create-upload-token', { method: 'POST' });
-      if(!tokenRes.ok) throw new Error('Failed to obtain upload token');
-      const { token } = await tokenRes.json();
-
-      // 2) Sign-in using the custom token
-      const auth = getAuth();
-      await signInWithCustomToken(auth, token);
-
-      // 3) Upload using Firebase Storage client (resumable)
-      const storage = getStorage();
-      const roomPath = `uploads/${myIp}/${Date.now()}-${file.name}`;
-      const fileRef = storageRef(storage, roomPath);
-      const uploadTask = uploadBytesResumable(fileRef, file, { contentType: file.type || 'application/octet-stream' });
-
-      await new Promise((resolve, reject) => {
-        uploadTask.on('state_changed', (snapshot) => {
-          const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          progressFill.style.width = pct + '%';
-          progressText.textContent = `Uploading ${file.name}... ${pct}%`;
-        }, (err) => reject(err), async () => {
-          // Completed — get the download URL and register the item with server
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          const regRes = await fetch('/api/complete-upload', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (await auth.currentUser.getIdToken()) },
-            body: JSON.stringify({ storageName: roomPath, originalName: file.name, size: file.size, mimetype: file.type })
-          });
-          if (!regRes.ok) return reject(new Error('Failed to register uploaded file'));
-          resolve();
-        });
+      await new Promise((resolve,reject)=>{
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/api/upload');
+        xhr.upload.onprogress = (e)=>{
+          if(e.lengthComputable){
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressFill.style.width = pct + '%';
+            progressText.textContent = `Uploading ${file.name}... ${pct}%`;
+          }
+        };
+        xhr.onload = ()=>{
+          if(xhr.status>=200 && xhr.status<300) {
+              const res = JSON.parse(xhr.responseText);
+              if (!myIp) myIp = res.roomId;
+              resolve();
+          }
+          else reject(new Error(`Upload failed: ${xhr.status}`));
+        };
+        xhr.onerror = ()=>reject(new Error('Upload failed'));
+        xhr.send(formData);
       });
-
-    } catch (err) {
-      console.error('Upload error:', err);
-      alert('Upload failed: ' + (err && err.message));
-    }
+      }catch(err){ console.error('Upload error:',err); }
   }
   hideProgress();
 }

@@ -53,35 +53,6 @@ try {
 }
 
 const bucket = getStorage().bucket();
-// Ensure the bucket has CORS configured to allow browser PUTs from the app origin.
-// This is required so the browser can perform a PUT to the signed URL without CORS errors.
-async function ensureBucketCors() {
-  try {
-    const allowed = (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.split(',')) || ['*'];
-    const corsConfig = [
-      {
-        origin: allowed,
-        method: ['GET', 'PUT', 'POST', 'HEAD', 'DELETE', 'OPTIONS'],
-        responseHeader: ['Content-Type', 'Content-Length', 'Content-MD5', 'x-goog-resumable-upload', 'x-goog-meta-*'],
-        maxAgeSeconds: 3600
-      }
-    ];
-
-    // Read existing metadata
-    const [meta] = await bucket.getMetadata().catch(() => [null]);
-    const existing = (meta && meta.cors) || [];
-    // Simple comparison: stringify
-    if (JSON.stringify(existing) !== JSON.stringify(corsConfig)) {
-      console.log('[Startup] Updating bucket CORS configuration');
-      await bucket.setMetadata({ cors: corsConfig });
-      console.log('[Startup] Bucket CORS updated');
-    } else {
-      console.log('[Startup] Bucket CORS already configured');
-    }
-  } catch (err) {
-    console.warn('[Startup] Could not set bucket CORS. You may see CORS errors on client PUTs. Error:', err && err.message);
-  }
-}
 let db;
 let itemsRef;
 try {
@@ -261,64 +232,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('[DB] Save error:', err.message);
     return res.status(500).json({ error: 'Failed to save item metadata' });
-  }
-});
-
-// POST /api/create-upload-token
-// Create a short-lived Firebase custom token for client to authenticate and upload via Firebase client SDK
-import { getAuth } from 'firebase-admin/auth';
-
-app.post('/api/create-upload-token', async (req, res) => {
-  try {
-    const roomId = getRoomId(req);
-    const uid = `upload-${uuidv4()}`;
-    // Embed roomId as a custom claim so server can validate later
-    const token = await getAuth().createCustomToken(uid, { roomId });
-    return res.json({ token, uid });
-  } catch (err) {
-    console.error('[Auth] Failed to create custom token:', err && err.message);
-    return res.status(500).json({ error: 'Failed to create upload token' });
-  }
-});
-
-// POST /api/complete-upload
-// Client calls this after uploading to Firebase Storage using the client SDK.
-// The client must pass an ID token in Authorization header which we verify.
-app.post('/api/complete-upload', express.json(), async (req, res) => {
-  try {
-    const idToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    if (!idToken) return res.status(401).json({ error: 'Missing Authorization token' });
-    const decoded = await getAuth().verifyIdToken(idToken);
-    const { storageName, originalName, size, mimetype } = req.body || {};
-    if (!storageName || !originalName) return res.status(400).json({ error: 'storageName and originalName are required' });
-
-    // Verify the custom claim roomId matches the request-derived roomId
-    const requesterRoom = getRoomId(req);
-    if (!decoded || !decoded.roomId || decoded.roomId !== requesterRoom) {
-      return res.status(403).json({ error: 'Token room mismatch' });
-    }
-
-    const id = uuidv4();
-    const now = Date.now();
-    const item = {
-      id,
-      type: 'file',
-      roomId: decoded.roomId,
-      content: null,
-      filename: storageName,
-      originalName,
-      mimetype: mimetype || 'application/octet-stream',
-      size: typeof size === 'number' ? size : null,
-      createdAt: now,
-      expiresAt: now + TTL
-    };
-
-    await itemsRef.child(id).set(item);
-    console.log(`[DB] Registered uploaded file room=${decoded.roomId} id=${id} file=${storageName}`);
-    return res.status(201).json(item);
-  } catch (err) {
-    console.error('[CompleteUpload] Error registering upload:', err && err.message);
-    return res.status(500).json({ error: 'Failed to register uploaded file' });
   }
 });
 
