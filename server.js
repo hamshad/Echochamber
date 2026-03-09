@@ -53,6 +53,35 @@ try {
 }
 
 const bucket = getStorage().bucket();
+// Ensure the bucket has CORS configured to allow browser PUTs from the app origin.
+// This is required so the browser can perform a PUT to the signed URL without CORS errors.
+async function ensureBucketCors() {
+  try {
+    const allowed = (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.split(',')) || ['*'];
+    const corsConfig = [
+      {
+        origin: allowed,
+        method: ['GET', 'PUT', 'POST', 'HEAD', 'DELETE', 'OPTIONS'],
+        responseHeader: ['Content-Type', 'Content-Length', 'Content-MD5', 'x-goog-resumable-upload', 'x-goog-meta-*'],
+        maxAgeSeconds: 3600
+      }
+    ];
+
+    // Read existing metadata
+    const [meta] = await bucket.getMetadata().catch(() => [null]);
+    const existing = (meta && meta.cors) || [];
+    // Simple comparison: stringify
+    if (JSON.stringify(existing) !== JSON.stringify(corsConfig)) {
+      console.log('[Startup] Updating bucket CORS configuration');
+      await bucket.setMetadata({ cors: corsConfig });
+      console.log('[Startup] Bucket CORS updated');
+    } else {
+      console.log('[Startup] Bucket CORS already configured');
+    }
+  } catch (err) {
+    console.warn('[Startup] Could not set bucket CORS. You may see CORS errors on client PUTs. Error:', err && err.message);
+  }
+}
 let db;
 let itemsRef;
 try {
