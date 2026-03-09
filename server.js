@@ -264,47 +264,38 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// POST /api/signed-upload
-// Returns a signed URL clients can PUT to directly (avoids sending large payloads through Vercel)
-app.post('/api/signed-upload', async (req, res) => {
+// POST /api/create-upload-token
+// Create a short-lived Firebase custom token for client to authenticate and upload via Firebase client SDK
+import { getAuth } from 'firebase-admin/auth';
+
+app.post('/api/create-upload-token', async (req, res) => {
   try {
-    const { originalName, contentType } = req.body || {};
-    if (!originalName || !contentType) return res.status(400).json({ error: 'originalName and contentType are required' });
-
     const roomId = getRoomId(req);
-    const id = uuidv4();
-    const ext = path.extname(originalName) || '';
-    const storageName = `uploads/${roomId}/${id}${ext}`;
-    const fileRef = bucket.file(storageName);
-
-    // Create a V4 signed URL for PUT/WRITE. Expires in 15 minutes by default.
-    const expiresMs = (parseInt(process.env.SIGNED_URL_EXPIRES_MS, 10) || 15 * 60 * 1000);
-    const [url] = await fileRef.getSignedUrl({
-      version: 'v4',
-      action: 'write',
-      expires: Date.now() + expiresMs,
-      contentType
-    });
-
-    return res.json({ url, storageName, expiresInMs: expiresMs });
+    const uid = `upload-${uuidv4()}`;
+    // Embed roomId as a custom claim so server can validate later
+    const token = await getAuth().createCustomToken(uid, { roomId });
+    return res.json({ token, uid });
   } catch (err) {
-    console.error('[SignedUpload] Error creating signed URL:', err && err.message);
-    return res.status(500).json({ error: 'Failed to create signed upload URL' });
+    console.error('[Auth] Failed to create custom token:', err && err.message);
+    return res.status(500).json({ error: 'Failed to create upload token' });
   }
 });
 
 // POST /api/complete-upload
-// Called by client after successful direct upload to register metadata in Realtime DB
+// Client calls this after uploading to Firebase Storage using the client SDK.
+// The client must pass an ID token in Authorization header which we verify.
 app.post('/api/complete-upload', express.json(), async (req, res) => {
   try {
+    const idToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!idToken) return res.status(401).json({ error: 'Missing Authorization token' });
+    const decoded = await getAuth().verifyIdToken(idToken);
     const { storageName, originalName, size, mimetype } = req.body || {};
     if (!storageName || !originalName) return res.status(400).json({ error: 'storageName and originalName are required' });
 
-    const roomId = getRoomId(req);
-
-    // Validate storageName belongs to this room (security check)
-    if (!storageName.startsWith(`uploads/${roomId}/`)) {
-      return res.status(400).json({ error: 'Invalid storage path for this room' });
+    // Verify the custom claim roomId matches the request-derived roomId
+    const requesterRoom = getRoomId(req);
+    if (!decoded || !decoded.roomId || decoded.roomId !== requesterRoom) {
+      return res.status(403).json({ error: 'Token room mismatch' });
     }
 
     const id = uuidv4();
@@ -312,7 +303,7 @@ app.post('/api/complete-upload', express.json(), async (req, res) => {
     const item = {
       id,
       type: 'file',
-      roomId,
+      roomId: decoded.roomId,
       content: null,
       filename: storageName,
       originalName,
@@ -323,7 +314,7 @@ app.post('/api/complete-upload', express.json(), async (req, res) => {
     };
 
     await itemsRef.child(id).set(item);
-    console.log(`[DB] Registered uploaded file room=${roomId} id=${id} file=${storageName}`);
+    console.log(`[DB] Registered uploaded file room=${decoded.roomId} id=${id} file=${storageName}`);
     return res.status(201).json(item);
   } catch (err) {
     console.error('[CompleteUpload] Error registering upload:', err && err.message);
