@@ -159,10 +159,9 @@ function hideProgress(){
 }
 
 async function uploadFiles(files){
+  // New flow: request a signed upload URL from server, PUT file directly to GCS, then call /api/complete-upload to register metadata
   for(const file of files){
     showProgress(`Uploading ${file.name}...`);
-    const formData = new FormData();
-    formData.append('file', file);
     const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
     items = [{
       id: optimisticId,
@@ -175,10 +174,21 @@ async function uploadFiles(files){
       roomId: myIp // Match current room for optimistic UI
     }, ...items];
     renderItems();
+
     try{
-      await new Promise((resolve,reject)=>{
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/api/upload');
+      // 1) Ask server for a signed URL
+      const metaRes = await fetch('/api/signed-upload', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalName: file.name, contentType: file.type || 'application/octet-stream' })
+      });
+      if(!metaRes.ok) throw new Error('Failed to obtain upload URL');
+      const meta = await metaRes.json();
+
+      // 2) PUT the file to the signed URL
+      const xhr = new XMLHttpRequest();
+      await new Promise((resolve, reject) => {
+        xhr.open('PUT', meta.url);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
         xhr.upload.onprogress = (e)=>{
           if(e.lengthComputable){
             const pct = Math.round((e.loaded / e.total) * 100);
@@ -187,17 +197,24 @@ async function uploadFiles(files){
           }
         };
         xhr.onload = ()=>{
-          if(xhr.status>=200 && xhr.status<300) {
-              const res = JSON.parse(xhr.responseText);
-              if (!myIp) myIp = res.roomId;
-              resolve();
-          }
-          else reject(new Error(`Upload failed: ${xhr.status}`));
+          if(xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error('Upload to storage failed'));
         };
-        xhr.onerror = ()=>reject(new Error('Upload failed'));
-        xhr.send(formData);
+        xhr.onerror = ()=>reject(new Error('Upload to storage failed'));
+        xhr.send(file);
       });
-      }catch(err){ console.error('Upload error:',err); }
+
+      // 3) Inform server the upload is complete so it can register metadata
+      const regRes = await fetch('/api/complete-upload', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ storageName: meta.storageName, originalName: file.name, size: file.size, mimetype: file.type })
+      });
+      if(!regRes.ok) throw new Error('Failed to register uploaded file');
+
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Upload failed: ' + (err && err.message));
+    }
   }
   hideProgress();
 }
