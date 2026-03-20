@@ -290,6 +290,29 @@ function syncDom(oldItems, newItems) {
 function renderTextCard(item){
   const timeLeft = getTimeLeft(item.expiresAt);
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+  
+  // Extract URLs for button generation
+  const urls = extractUrls(item.content);
+  const youtubeUrls = extractYouTubeUrls(item.content);
+  
+  // Generate URL action buttons
+  let urlButtons = '';
+  if (urls.length > 0 || youtubeUrls.length > 0) {
+    urlButtons = '<div class="url-actions">';
+    
+    // Add redirect button for first URL (if any)
+    if (urls.length > 0) {
+      urlButtons += `<button class="url-btn" onclick="window.open('${urls[0]}', '_blank')" title="Open Link">🔗</button>`;
+    }
+    
+    // Add YouTube play button for first YouTube URL (if any)
+    if (youtubeUrls.length > 0) {
+      urlButtons += `<button class="youtube-btn" onclick="openYouTubePopup('${youtubeUrls[0].videoId}')" title="Play YouTube Video">▶️</button>`;
+    }
+    
+    urlButtons += '</div>';
+  }
+  
   return `
     <div class="item-card text" data-id="${item.id}" style="view-transition-name: card-${item.id}">
       <div class="item-header">
@@ -297,10 +320,11 @@ function renderTextCard(item){
         <div class="item-actions">
           <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
           <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View">👁</button>
+          ${urlButtons}
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
       </div>
-      <div class="text-content">${renderTextWithLinks(item.content)}</div>
+      <div class="text-content">${escapeHtml(item.content)}</div>
       <div class="item-footer">
         <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
         <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
@@ -419,8 +443,8 @@ window.openYouTubePopup = function(videoId){
         <button class="youtube-popup-close" onclick="closeYouTubePopup()">✕</button>
         <div class="youtube-video-container">
           <iframe 
-            width="560" 
-            height="315" 
+            width="480" 
+            height="270" 
             src="https://www.youtube.com/embed/${videoId}?autoplay=1"
             title="YouTube video player"
             frameborder="0"
@@ -546,48 +570,8 @@ function extractYouTubeUrls(text) {
 }
 
 function renderTextWithLinks(text) {
-  // First, escape HTML to prevent XSS
-  let escapedText = escapeHtml(text);
-  
-  // Find all URLs
-  const urls = extractUrls(text);
-  
-  // Process YouTube URLs first (they're more specific)
-  const youtubeUrls = extractYouTubeUrls(text);
-  youtubeUrls.forEach(yt => {
-    const escapedUrl = escapeHtml(yt.fullUrl);
-    const playButton = `<button class="youtube-btn" onclick="openYouTubePopup('${yt.videoId}')">▶️ Play Video</button>`;
-    // Replace the YouTube URL with itself plus play button
-    escapedText = escapedText.replace(escapedUrl, escapedUrl + ' ' + playButton);
-  });
-  
-  // Find all URLs again (now including the YouTube URLs that we've already processed)
-  const allUrls = extractUrls(escapedText);
-  
-  // Replace each URL with a link button, but skip if it's already inside a button
-  allUrls.forEach(url => {
-    // Check if this URL is already inside a button we added
-    const urlPattern = new RegExp(escapeHtml(url));
-    const match = escapedText.match(urlPattern);
-    if (match) {
-      // Check if the match is not already inside a button
-      const matchIndex = escapedText.indexOf(match[0]);
-      const beforeMatch = escapedText.substring(0, matchIndex);
-      const afterMatch = escapedText.substring(matchIndex + match[0].length);
-      
-      // Simple check: if there's an opening button tag before without closing after, skip
-      const buttonOpenCount = (beforeMatch.match(/<button/g) || []).length;
-      const buttonCloseCount = (beforeMatch.match(/<\/button/g) || []).length;
-      
-      if (buttonOpenCount <= buttonCloseCount) {
-        // This URL is not already inside a button we added, so we can wrap it
-        const linkButton = `<button class="url-btn" onclick="window.open('${url}', '_blank')">🔗 Open Link</button>`;
-        escapedText = escapedText.replace(url, linkButton);
-      }
-    }
-  });
-  
-  return escapedText;
+  // Just escape HTML to prevent XSS, don't modify content
+  return escapeHtml(text);
 }
 
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }

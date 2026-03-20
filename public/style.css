@@ -291,6 +291,13 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
+/* URL actions container */
+.url-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
 .youtube-btn {
   display: inline-flex;
   align-items: center;

@@ -21,8 +21,9 @@ key-files:
 decisions:
   - "Implemented URL detection using regex patterns rather than external library to minimize dependencies"
   - "YouTube detection uses specific regex to extract video IDs for embedding"
-  - "URL rendering preserves existing text formatting while adding interactive buttons"
+  - "URL rendering preserves existing text formatting while adding action buttons beside copy/view controls"
   - "YouTube popup uses CSS-fixed positioning with backdrop for mobile-friendly experience"
+  - "URL action buttons are placed in item header alongside copy/view/delete buttons, not inside text content"
 metrics:
   duration: 30  # minutes
   completed_date: 2026-03-20
@@ -42,14 +43,19 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 1. Added URL detection functions:
    - `extractUrls()`: Identifies all HTTP/HTTPS URLs in text
    - `extractYouTubeUrls()`: Specifically identifies YouTube URLs and extracts video IDs
-   - `renderTextWithLinks()`: Processes text to escape HTML, add URL buttons, and add YouTube play buttons
+   - `renderTextWithLinks()`: Processes text to escape HTML only (no content modification)
 
-2. Modified `renderTextCard()` to use `renderTextWithLinks()` instead of basic HTML escaping
+2. Modified `renderTextCard()` to:
+   - Keep text content unchanged (using `escapeHtml` only)
+   - Extract URLs and YouTube URLs separately
+   - Add URL action buttons (🔗 Open Link and ▶️ Play YouTube) in the item header alongside existing copy/view/delete buttons
+   - Only show buttons for detected URLs (conditional display)
 
 3. Added YouTube popup functionality:
    - `openYouTubePopup(videoId)`: Creates or updates a YouTube video popup iframe
    - `closeYouTubePopup()`: Hides the popup and stops video playback
    - Popup includes close button and click-to-close-on-backdrop functionality
+   - Reduced popup size from 560x315 to 480x270 for less intrusive preview
 
 ### public/style.css
 1. Added styling for URL buttons:
@@ -57,7 +63,10 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
    - `.youtube-btn`: Red button for YouTube playback
    - Both include hover effects and proper spacing
 
-2. Added YouTube popup styles:
+2. Added URL actions container styling:
+   - `.url-actions`: Flex container for URL buttons with proper spacing
+
+3. Added YouTube popup styles:
    - `.youtube-popup`: Full-screen fixed backdrop
    - `.youtube-popup-content`: Container with dark background and rounded corners
    - `.youtube-popup-close`: Red close button in top-right corner
@@ -73,10 +82,22 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 - **Files modified:** public/app.js, public/style.css
 - **Commit:** c911e21
 
+### Refinements Based on User Feedback
+**2. [Rule 3 - Blocking Issues] Adjusted UI placement and YouTube popup size**
+- **Found during:** User testing and feedback
+- **Issue:** Buttons were appearing inside text content rather than alongside action buttons, and YouTube popup was too large
+- **Fix:** 
+  - Moved URL action buttons to item header alongside copy/view/delete buttons
+  - Made URL button display conditional (only show when URLs are present)
+  - Reduced YouTube popup size for better user experience
+- **Files modified:** public/app.js, public/style.css
+- **Commit:** [latest commit]
+
 ## Verification
-- Regular URLs in shared text now show 🔗 Open Link button that opens in new tab
-- YouTube URLs show both 🔗 Open Link and ▶️ Play Video buttons
-- Clicking Play Video opens YouTube video in app popup with autoplay
+- Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
+- YouTube URLs show both 🔗 Open Link and ▶️ Play Video buttons in item header
+- Text content remains unchanged and readable (no buttons inside text)
+- Clicking Play Video opens YouTube video in app popup with autoplay at reduced size
 - Popup can be closed by clicking the X button or clicking outside the video container
 - All existing functionality (text sharing, file upload, real-time updates) remains intact
 - Mobile responsive design maintained
@@ -88,3 +109,5 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 - Commits exist for changes made
 - URL detection works correctly for various URL formats
 - YouTube playback functions as expected
+- URL buttons appear in correct location (item header)
+- Text content is not modified by URL processing
