@@ -317,6 +317,7 @@ textarea:focus {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
+  z-index: 0;
 }
 
 .youtube-popup-dialog {
@@ -329,6 +330,7 @@ textarea:focus {
   box-shadow: 0 24px 120px rgba(0,0,0,0.6);
   display: flex;
   flex-direction: column;
+  z-index: 10;
 }
 
 .youtube-popup-close {
