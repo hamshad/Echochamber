@@ -300,7 +300,7 @@ function renderTextCard(item){
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
       </div>
-      <div class="text-content">${escapeHtml(item.content)}</div>
+      <div class="text-content">${renderTextWithLinks(item.content)}</div>
       <div class="item-footer">
         <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
         <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
@@ -407,6 +407,60 @@ window.openTextModal = function(id){
   modalSaveBtn.disabled = true;
 }
 
+window.openYouTubePopup = function(videoId){
+  // Create popup container if it doesn't exist
+  let popup = document.getElementById('youtube-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'youtube-popup';
+    popup.className = 'youtube-popup';
+    popup.innerHTML = `
+      <div class="youtube-popup-content">
+        <button class="youtube-popup-close" onclick="closeYouTubePopup()">✕</button>
+        <div class="youtube-video-container">
+          <iframe 
+            width="560" 
+            height="315" 
+            src="https://www.youtube.com/embed/${videoId}?autoplay=1"
+            title="YouTube video player"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(popup);
+    
+    // Add click outside to close
+    popup.addEventListener('click', function(e) {
+      if (e.target === popup) {
+        closeYouTubePopup();
+      }
+    });
+  }
+  
+  // Update the video source
+  const iframe = popup.querySelector('iframe');
+  if (iframe) {
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+  }
+  
+  popup.style.display = 'flex';
+}
+
+window.closeYouTubePopup = function(){
+  const popup = document.getElementById('youtube-popup');
+  if (popup) {
+    popup.style.display = 'none';
+    // Stop the video by clearing the src
+    const iframe = popup.querySelector('iframe');
+    if (iframe) {
+      iframe.src = '';
+    }
+  }
+}
+
 function closeTextModal(){
   // Reset modal content to default textarea placeholder so next open is consistent
   const body = document.querySelector('.text-modal-body');
@@ -475,6 +529,66 @@ document.addEventListener('keydown', (e)=>{
     }
   }
 });
+
+// URL detection functions
+function extractUrls(text) {
+  const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+  return [...text.matchAll(urlPattern)].map(match => match[0]);
+}
+
+function extractYouTubeUrls(text) {
+  const youtubePattern = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([^&\s]+)|https?:\/\/youtu\.be\/([^&\s?]+)/g;
+  const matches = [...text.matchAll(youtubePattern)];
+  return matches.map(match => ({
+    fullUrl: match[0],
+    videoId: match[1] || match[2]
+  }));
+}
+
+function renderTextWithLinks(text) {
+  // First, escape HTML to prevent XSS
+  let escapedText = escapeHtml(text);
+  
+  // Find all URLs
+  const urls = extractUrls(text);
+  
+  // Process YouTube URLs first (they're more specific)
+  const youtubeUrls = extractYouTubeUrls(text);
+  youtubeUrls.forEach(yt => {
+    const escapedUrl = escapeHtml(yt.fullUrl);
+    const playButton = `<button class="youtube-btn" onclick="openYouTubePopup('${yt.videoId}')">▶️ Play Video</button>`;
+    // Replace the YouTube URL with itself plus play button
+    escapedText = escapedText.replace(escapedUrl, escapedUrl + ' ' + playButton);
+  });
+  
+  // Find all URLs again (now including the YouTube URLs that we've already processed)
+  const allUrls = extractUrls(escapedText);
+  
+  // Replace each URL with a link button, but skip if it's already inside a button
+  allUrls.forEach(url => {
+    // Check if this URL is already inside a button we added
+    const urlPattern = new RegExp(escapeHtml(url));
+    const match = escapedText.match(urlPattern);
+    if (match) {
+      // Check if the match is not already inside a button
+      const matchIndex = escapedText.indexOf(match[0]);
+      const beforeMatch = escapedText.substring(0, matchIndex);
+      const afterMatch = escapedText.substring(matchIndex + match[0].length);
+      
+      // Simple check: if there's an opening button tag before without closing after, skip
+      const buttonOpenCount = (beforeMatch.match(/<button/g) || []).length;
+      const buttonCloseCount = (beforeMatch.match(/<\/button/g) || []).length;
+      
+      if (buttonOpenCount <= buttonCloseCount) {
+        // This URL is not already inside a button we added, so we can wrap it
+        const linkButton = `<button class="url-btn" onclick="window.open('${url}', '_blank')">🔗 Open Link</button>`;
+        escapedText = escapedText.replace(url, linkButton);
+      }
+    }
+  });
+  
+  return escapedText;
+}
 
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
 
