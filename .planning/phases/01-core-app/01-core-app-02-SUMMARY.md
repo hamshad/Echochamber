@@ -94,14 +94,14 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
   - Made URL button display conditional (only show when URLs are present)
   - Reduced YouTube popup size for better user experience
 - **Files modified:** public/app.js, public/style.css
-- **Commit:** [initial refinement commit]
+- **Commit:** b0dbb84
 
 **3. [Rule 1 - Bug Fix] Fixed YouTube popup video visibility issue**
 - **Found during:** Testing YouTube playback functionality
 - **Issue:** YouTube video was not visible in popup (only audio played), likely due to z-index or positioning issues with iframe
 - **Fix:** Changed popup structure to use backdrop and dialog approach with proper stacking context
 - **Files modified:** public/app.js, public/style.css
-- **Commit:** [latest commit]
+- **Commit:** 79620d8
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
