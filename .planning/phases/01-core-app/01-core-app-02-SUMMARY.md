@@ -25,9 +25,9 @@ decisions:
   - "YouTube popup uses CSS-fixed positioning with backdrop for mobile-friendly experience"
   - "URL action buttons are placed in item header alongside copy/view/delete buttons, not inside text content"
   - "YouTube popup uses dialog overlay approach with backdrop click-to-close for reliable video display"
-  - "Fixed YouTube popup z-index issue to ensure dialog is visible above backdrop"
+  - "Fixed YouTube popup z-index and layout issues to ensure dialog and video are visible"
 metrics:
-  duration: 50  # minutes
+  duration: 55  # minutes
   completed_date: 2026-03-20
 ---
 
@@ -71,10 +71,11 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 
 3. Added YouTube popup styles:
    - `.youtube-popup`: Fixed position container with semi-transparent backdrop
-   - `.youtube-popup-backdrop`: Semi-transparent dark background layer (z-index: 0)
-   - `.youtube-popup-dialog`: Container for video content with dark background and rounded corners (z-index: 10)
+   - `.youtube-popup-backdrop`: Semi-transparent dark background layer
+   - `.youtube-popup-dialog`: Container for video content with dark background and rounded corners
    - `.youtube-popup-close`: Red close button in top-right corner
    - `.youtube-video-container`: Flex container that takes remaining space for video iframe
+   - Fixed layout issues to ensure proper sizing and visibility
 
 ## Deviations from Plan
 
@@ -99,10 +100,13 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 
 **3. [Rule 1 - Bug Fix] Fixed YouTube popup video visibility issue**
 - **Found during:** Testing YouTube playback functionality
-- **Issue:** YouTube video was not visible in popup (only backdrop showing), due to missing z-index on dialog element
-- **Fix:** Added proper z-index values to ensure dialog appears above backdrop
+- **Issue:** YouTube video was not visible in popup (only backdrop showing or layout issues), due to z-index, positioning, or sizing problems
+- **Fix:** 
+  - Added proper z-index values to ensure dialog appears above backdrop
+  - Fixed popup dialog sizing and layout to ensure video container is visible
+  - Corrected positioning context for iframe within video container
 - **Files modified:** public/app.js, public/style.css
-- **Commit:** b59c39a
+- **Commit:** [latest commit]
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
