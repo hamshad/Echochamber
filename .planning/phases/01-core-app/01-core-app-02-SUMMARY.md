@@ -24,8 +24,9 @@ decisions:
   - "URL rendering preserves existing text formatting while adding action buttons beside copy/view controls"
   - "YouTube popup uses CSS-fixed positioning with backdrop for mobile-friendly experience"
   - "URL action buttons are placed in item header alongside copy/view/delete buttons, not inside text content"
+  - "YouTube popup uses dialog overlay approach with backdrop click-to-close for reliable video display"
 metrics:
-  duration: 30  # minutes
+  duration: 45  # minutes
   completed_date: 2026-03-20
 ---
 
@@ -52,10 +53,11 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
    - Only show buttons for detected URLs (conditional display)
 
 3. Added YouTube popup functionality:
-   - `openYouTubePopup(videoId)`: Creates or updates a YouTube video popup iframe
+   - `openYouTubePopup(videoId)`: Creates or updates a YouTube video popup dialog
    - `closeYouTubePopup()`: Hides the popup and stops video playback
    - Popup includes close button and click-to-close-on-backdrop functionality
-   - Reduced popup size from 560x315 to 480x270 for less intrusive preview
+   - Uses dialog overlay approach for reliable video display
+   - Reduced popup size for better user experience
 
 ### public/style.css
 1. Added styling for URL buttons:
@@ -67,10 +69,11 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
    - `.url-actions`: Flex container for URL buttons with proper spacing
 
 3. Added YouTube popup styles:
-   - `.youtube-popup`: Full-screen fixed backdrop
-   - `.youtube-popup-content`: Container with dark background and rounded corners
+   - `.youtube-popup`: Fixed position container with semi-transparent backdrop
+   - `.youtube-popup-backdrop`: Semi-transparent dark background layer
+   - `.youtube-popup-dialog`: Container for video content with dark background and rounded corners
    - `.youtube-popup-close`: Red close button in top-right corner
-   - `.youtube-video-container`: Responsive 16:9 iframe container
+   - `.youtube-video-container`: Flex container that takes remaining space for video iframe
 
 ## Deviations from Plan
 
@@ -91,14 +94,21 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
   - Made URL button display conditional (only show when URLs are present)
   - Reduced YouTube popup size for better user experience
 - **Files modified:** public/app.js, public/style.css
+- **Commit:** [initial refinement commit]
+
+**3. [Rule 1 - Bug Fix] Fixed YouTube popup video visibility issue**
+- **Found during:** Testing YouTube playback functionality
+- **Issue:** YouTube video was not visible in popup (only audio played), likely due to z-index or positioning issues with iframe
+- **Fix:** Changed popup structure to use backdrop and dialog approach with proper stacking context
+- **Files modified:** public/app.js, public/style.css
 - **Commit:** [latest commit]
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
 - YouTube URLs show both 🔗 Open Link and ▶️ Play Video buttons in item header
 - Text content remains unchanged and readable (no buttons inside text)
-- Clicking Play Video opens YouTube video in app popup with autoplay at reduced size
-- Popup can be closed by clicking the X button or clicking outside the video container
+- Clicking Play Video opens YouTube video in app popup with autoplay and visible video
+- Popup can be closed by clicking the X button or clicking outside the video container (on backdrop)
 - All existing functionality (text sharing, file upload, real-time updates) remains intact
 - Mobile responsive design maintained
 - XSS prevention through proper HTML escaping before URL processing
@@ -108,6 +118,6 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 - JavaScript syntax is valid
 - Commits exist for changes made
 - URL detection works correctly for various URL formats
-- YouTube playback functions as expected
+- YouTube playback functions as expected with visible video
 - URL buttons appear in correct location (item header)
 - Text content is not modified by URL processing

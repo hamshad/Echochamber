@@ -439,12 +439,11 @@ window.openYouTubePopup = function(videoId){
     popup.id = 'youtube-popup';
     popup.className = 'youtube-popup';
     popup.innerHTML = `
-      <div class="youtube-popup-content">
+      <div class="youtube-popup-backdrop"></div>
+      <div class="youtube-popup-dialog">
         <button class="youtube-popup-close" onclick="closeYouTubePopup()">✕</button>
         <div class="youtube-video-container">
           <iframe 
-            width="480" 
-            height="270" 
             src="https://www.youtube.com/embed/${videoId}?autoplay=1"
             title="YouTube video player"
             frameborder="0"
@@ -456,7 +455,7 @@ window.openYouTubePopup = function(videoId){
     `;
     document.body.appendChild(popup);
     
-    // Add click outside to close
+    // Add click outside to close (on backdrop)
     popup.addEventListener('click', function(e) {
       if (e.target === popup) {
         closeYouTubePopup();
@@ -465,7 +464,7 @@ window.openYouTubePopup = function(videoId){
   }
   
   // Update the video source
-  const iframe = popup.querySelector('iframe');
+  const iframe = popup.querySelector('.youtube-video-container iframe');
   if (iframe) {
     iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
   }
