@@ -102,7 +102,7 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 - **Issue:** YouTube video was not visible in popup (only backdrop showing), due to missing z-index on dialog element
 - **Fix:** Added proper z-index values to ensure dialog appears above backdrop
 - **Files modified:** public/app.js, public/style.css
-- **Commit:** [latest commit]
+- **Commit:** b59c39a
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
