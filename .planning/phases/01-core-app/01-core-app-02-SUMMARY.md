@@ -106,7 +106,7 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
   - Fixed popup dialog sizing and layout to ensure video container is visible
   - Corrected positioning context for iframe within video container
 - **Files modified:** public/app.js, public/style.css
-- **Commit:** [latest commit]
+- **Commit:** 34b59c4
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)
