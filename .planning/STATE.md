@@ -23,3 +23,5 @@ Phase 2: Firebase Storage Migration — Ready to execute (blocked on Firebase cr
   1. Firebase service account JSON (downloaded from Firebase Console)
   2. Firebase Storage bucket name (e.g. `your-project-id.firebasestorage.app`)
   3. Firebase Storage rules set to open (allow read, write: if true)
+
+- **URL detection and YouTube playback** — added redirect buttons for all URLs and play buttons for YouTube videos in shared text items.
