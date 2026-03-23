@@ -24,10 +24,10 @@ decisions:
   - "URL rendering preserves existing text formatting while adding action buttons beside copy/view controls"
   - "YouTube popup uses CSS-fixed positioning with backdrop for mobile-friendly experience"
   - "URL action buttons are placed in item header alongside copy/view/delete buttons, not inside text content"
-  - "YouTube popup uses dialog overlay approach with backdrop click-to-close for reliable video display"
-  - "Fixed YouTube popup z-index and layout issues to ensure dialog and video are visible"
+  - "YouTube popup uses dialog overlay approach with explicit sizing for reliable video display"
+  - "Fixed YouTube popup to use simple 560x315 dimensions with 100% iframe sizing to ensure video visibility"
 metrics:
-  duration: 55  # minutes
+  duration: 60  # minutes
   completed_date: 2026-03-20
 ---
 
@@ -57,8 +57,7 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
    - `openYouTubePopup(videoId)`: Creates or updates a YouTube video popup dialog
    - `closeYouTubePopup()`: Hides the popup and stops video playback
    - Popup includes close button and click-to-close-on-backdrop functionality
-   - Uses dialog overlay approach for reliable video display
-   - Reduced popup size for better user experience
+   - Uses simple explicit sizing (560x315) for reliable video display
 
 ### public/style.css
 1. Added styling for URL buttons:
@@ -70,12 +69,12 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
    - `.url-actions`: Flex container for URL buttons with proper spacing
 
 3. Added YouTube popup styles:
-   - `.youtube-popup`: Fixed position container with semi-transparent backdrop
-   - `.youtube-popup-backdrop`: Semi-transparent dark background layer
-   - `.youtube-popup-dialog`: Container for video content with dark background and rounded corners
+   - `.youtube-popup`: Fixed position container with dark backdrop
+   - `.youtube-popup-backdrop`: Transparent backdrop for click detection
+   - `.youtube-popup-dialog`: Container with explicit 560x315 dimensions
    - `.youtube-popup-close`: Red close button in top-right corner
-   - `.youtube-video-container`: Flex container that takes remaining space for video iframe
-   - Fixed layout issues to ensure proper sizing and visibility
+   - `.youtube-video-container`: 100% width/height for iframe
+   - iframe: 100% width/height to fill container
 
 ## Deviations from Plan
 
@@ -100,13 +99,13 @@ Enhanced the Echochamber frontend to automatically detect URLs in shared text co
 
 **3. [Rule 1 - Bug Fix] Fixed YouTube popup video visibility issue**
 - **Found during:** Testing YouTube playback functionality
-- **Issue:** YouTube video was not visible in popup (only backdrop showing or layout issues), due to z-index, positioning, or sizing problems
+- **Issue:** YouTube video was not visible in popup (iframe showing 0x0 size), due to complex CSS sizing with flex-grow
 - **Fix:** 
-  - Added proper z-index values to ensure dialog appears above backdrop
-  - Fixed popup dialog sizing and layout to ensure video container is visible
-  - Corrected positioning context for iframe within video container
-- **Files modified:** public/app.js, public/style.css
-- **Commit:** 34b59c4
+  - Simplified CSS to use explicit 560x315 dimensions on dialog
+  - Removed complex flex-grow and relative sizing that caused 0x0 iframe
+  - Used simple 100% width/height for iframe to fill container
+- **Files modified:** public/style.css
+- **Commit:** [latest commit]
 
 ## Verification
 - Regular URLs in shared text now show 🔗 Open Link button in item header (alongside copy/view/delete)

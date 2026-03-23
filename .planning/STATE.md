@@ -24,4 +24,4 @@ Phase 2: Firebase Storage Migration — Ready to execute (blocked on Firebase cr
   2. Firebase Storage bucket name (e.g. `your-project-id.firebasestorage.app`)
   3. Firebase Storage rules set to open (allow read, write: if true)
 
-- **URL detection and YouTube playback** — added redirect and play buttons for URLs in shared text items, positioned alongside action buttons in item headers; fixed YouTube popup layout and z-index to ensure video visibility
+- **URL detection and YouTube playback** — added redirect and play buttons for URLs in shared text items, positioned alongside action buttons in item headers; fixed YouTube popup with explicit sizing to ensure video visibility
