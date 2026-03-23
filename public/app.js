@@ -320,6 +320,7 @@ function renderTextCard(item){
         <div class="item-actions">
           <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
           <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View">👁</button>
+          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time">⏱</button>
           ${urlButtons}
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
@@ -342,6 +343,7 @@ function renderFileCard(item){
       <div class="item-header">
         <span class="item-type file">📎 File</span>
         <div class="item-actions">
+          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time">⏱</button>
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
       </div>
@@ -580,5 +582,145 @@ function formatFileSize(bytes){ if(!bytes) return '0 B'; const units=['B','KB','
 function getTimeLeft(expiresAt){ const ms = expiresAt - Date.now(); if(ms<=0) return 'Expired'; const mins = Math.floor(ms/60000); if(mins>=60) return `${Math.floor(mins/60)}h ${mins%60}m left`; return `${mins}m left`; }
 
 function formatSize(chars){ return typeof chars === 'number' ? chars.toLocaleString() : chars; }
+
+// --- Extend TTL Time Picker ---
+let extendDialogEl = null;
+let extendItemId = null;
+
+window.openExtendDialog = function(itemId, btnEl) {
+  closeExtendDialog();
+  extendItemId = itemId;
+
+  const card = btnEl.closest('.item-card');
+  const cardRect = card.getBoundingClientRect();
+
+  const dialog = document.createElement('div');
+  dialog.className = 'extend-dialog';
+  dialog.innerHTML = `
+    <div class="extend-dialog-header">Extend Time</div>
+    <div class="extend-picker">
+      <div class="extend-column" data-type="hours">
+        <div class="extend-column-label">Hours</div>
+        <div class="extend-scroll">
+          <div class="extend-scroll-spacer"></div>
+          ${Array.from({length: 24}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
+          <div class="extend-scroll-spacer"></div>
+        </div>
+      </div>
+      <div class="extend-separator">:</div>
+      <div class="extend-column" data-type="minutes">
+        <div class="extend-column-label">Minutes</div>
+        <div class="extend-scroll">
+          <div class="extend-scroll-spacer"></div>
+          ${Array.from({length: 60}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
+          <div class="extend-scroll-spacer"></div>
+        </div>
+      </div>
+    </div>
+    <div class="extend-actions">
+      <button class="btn extend-cancel">Cancel</button>
+      <button class="btn btn-primary extend-confirm">Extend</button>
+    </div>
+  `;
+
+  // Position the dialog near the card
+  const top = cardRect.bottom + window.scrollY + 8;
+  let left = cardRect.left + window.scrollX;
+  // Clamp so it doesn't overflow viewport
+  const dialogWidth = 240;
+  if (left + dialogWidth > window.innerWidth - 16) {
+    left = window.innerWidth - dialogWidth - 16;
+  }
+  if (left < 8) left = 8;
+  dialog.style.top = top + 'px';
+  dialog.style.left = left + 'px';
+
+  document.body.appendChild(dialog);
+  extendDialogEl = dialog;
+
+  // Setup scroll snapping
+  const scrolls = dialog.querySelectorAll('.extend-scroll');
+  scrolls.forEach(scroll => {
+    // Initial scroll to 0 (first item selected)
+    requestAnimationFrame(() => {
+      scroll.scrollTop = 0;
+      updateSelected(scroll);
+    });
+    scroll.addEventListener('scroll', () => {
+      updateSelected(scroll);
+    }, { passive: true });
+  });
+
+  // Cancel button
+  dialog.querySelector('.extend-cancel').addEventListener('click', closeExtendDialog);
+
+  // Confirm button
+  dialog.querySelector('.extend-confirm').addEventListener('click', async () => {
+    const hoursScroll = dialog.querySelector('[data-type="hours"] .extend-scroll');
+    const minsScroll = dialog.querySelector('[data-type="minutes"] .extend-scroll');
+    const hours = getSelectedValue(hoursScroll);
+    const mins = getSelectedValue(minsScroll);
+    if (hours === 0 && mins === 0) return;
+
+    const confirmBtn = dialog.querySelector('.extend-confirm');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '...';
+
+    try {
+      const res = await fetch(`/api/items/${extendItemId}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours, minutes: mins })
+      });
+      if (!res.ok) throw new Error('Extend failed');
+      closeExtendDialog();
+    } catch (err) {
+      console.error('Extend failed:', err);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Extend';
+    }
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+  }, 0);
+};
+
+function updateSelected(scroll) {
+  const options = scroll.querySelectorAll('.extend-option');
+  const scrollTop = scroll.scrollTop;
+  const itemHeight = options[0] ? options[0].offsetHeight : 36;
+  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
+  const selectedIndex = Math.round((scrollTop - spacerHeight + itemHeight / 2) / itemHeight);
+  options.forEach((opt, i) => {
+    opt.classList.toggle('selected', i === selectedIndex);
+  });
+}
+
+function getSelectedValue(scroll) {
+  const options = scroll.querySelectorAll('.extend-option');
+  const scrollTop = scroll.scrollTop;
+  const itemHeight = options[0] ? options[0].offsetHeight : 36;
+  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
+  const idx = Math.round((scrollTop - spacerHeight + itemHeight / 2) / itemHeight);
+  const clamped = Math.max(0, Math.min(idx, options.length - 1));
+  return parseInt(options[clamped]?.dataset.value ?? '0', 10);
+}
+
+function handleOutsideClick(e) {
+  if (extendDialogEl && !extendDialogEl.contains(e.target) && !e.target.closest('.extend-btn')) {
+    closeExtendDialog();
+  }
+}
+
+function closeExtendDialog() {
+  document.removeEventListener('click', handleOutsideClick);
+  if (extendDialogEl) {
+    extendDialogEl.remove();
+    extendDialogEl = null;
+    extendItemId = null;
+  }
+}
 
 setInterval(()=>{ try{ renderItems(); }catch(e){} },30000);

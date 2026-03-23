@@ -259,6 +259,27 @@ app.get('/api/download/:id', async (req, res) => {
   }
 });
 
+// POST /api/items/:id/extend
+app.post('/api/items/:id/extend', async (req, res) => {
+  const id = req.params.id;
+  const { hours = 0, minutes = 0 } = req.body || {};
+  const addMs = ((parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0)) * 60 * 1000;
+  if (addMs <= 0) return res.status(400).json({ error: 'Provide hours or minutes greater than 0' });
+  try {
+    const snapshot = await itemsRef.child(id).once('value');
+    const item = snapshot.val();
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    if (item.expiresAt <= Date.now()) return res.status(410).json({ error: 'Item already expired' });
+    const roomId = getRoomId(req);
+    if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
+    const newExpiresAt = item.expiresAt + addMs;
+    await itemsRef.child(id).update({ expiresAt: newExpiresAt });
+    return res.json({ success: true, expiresAt: newExpiresAt });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to extend TTL' });
+  }
+});
+
 // DELETE /api/items/:id
 app.delete('/api/items/:id', async (req, res) => {
   const id = req.params.id;
