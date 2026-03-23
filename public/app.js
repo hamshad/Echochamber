@@ -734,9 +734,11 @@ function updateSelected(scroll) {
   const scrollTop = scroll.scrollTop;
   const itemHeight = options[0] ? options[0].offsetHeight : 36;
   const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
-  const selectedIndex = Math.round((scrollTop - spacerHeight + itemHeight / 2) / itemHeight);
+  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
+  const selectedIndex = Math.round((scrollTop - spacerHeight + centerOffset) / itemHeight);
+  const clamped = Math.max(0, Math.min(selectedIndex, options.length - 1));
   options.forEach((opt, i) => {
-    opt.classList.toggle('selected', i === selectedIndex);
+    opt.classList.toggle('selected', i === clamped);
   });
 }
 
@@ -757,7 +759,8 @@ function getSelectedValue(scroll) {
   const scrollTop = scroll.scrollTop;
   const itemHeight = options[0] ? options[0].offsetHeight : 36;
   const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
-  const idx = Math.round((scrollTop - spacerHeight + itemHeight / 2) / itemHeight);
+  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
+  const idx = Math.round((scrollTop - spacerHeight + centerOffset) / itemHeight);
   const clamped = Math.max(0, Math.min(idx, options.length - 1));
   return parseInt(options[clamped]?.dataset.value ?? '0', 10);
 }
