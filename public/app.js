@@ -5,6 +5,10 @@ import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11
 let db;
 let items = [];
 let myIp = null; // Will be set from server
+let showAll = false;
+let tapCount = 0;
+let tapTimer = null;
+let cachedAllItems = [];
 
 const textInput = document.getElementById('text-input');
 const shareTextBtn = document.getElementById('share-text-btn');
@@ -68,15 +72,9 @@ async function initFirebase() {
     itemsGrid.classList.remove('hidden');
     
     const data = snapshot.val() || {};
-    const allItems = Object.values(data);
-    const now = Date.now();
+    cachedAllItems = Object.values(data);
     
-    // ROOM SCOPING: Match roomId exactly with what server detected
-    items = allItems
-      .filter(i => i.expiresAt > now && (i.roomId === myIp))
-      .sort((a, b) => b.createdAt - a.createdAt);
-    
-    renderItems();
+    filterAndRender();
     setStatusConnected(true);
   }, (error) => {
     console.error('Firebase DB Error:', error);
@@ -92,6 +90,14 @@ async function initFirebase() {
 // Trigger lazy cleanup on init
 fetch('/api/cleanup').catch(() => {});
 
+function filterAndRender() {
+  const now = Date.now();
+  items = cachedAllItems
+    .filter(i => i.expiresAt > now && (showAll || i.roomId === myIp))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  renderItems();
+}
+
 shareTextBtn.addEventListener('click', shareText);
 textInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) shareText();
@@ -101,6 +107,95 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files.length) uploadFiles(fileInput.files);
   fileInput.value = '';
 });
+
+// Easter egg: tap/click "Echochamber" random(7-20) times to show all items across all IPs
+const easterEggTaps = Math.floor(Math.random() * 14) + 7;
+const brandTitle = document.getElementById('brand-title');
+brandTitle.addEventListener('click', () => {
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
+  if (tapCount >= easterEggTaps) {
+    tapCount = 0;
+    clearTimeout(tapTimer);
+    if (showAll) {
+      toggleShowAll(false);
+    } else {
+      showKeypad();
+    }
+  }
+});
+
+function toggleShowAll(enable) {
+  showAll = enable;
+  document.body.classList.toggle('show-all-active', showAll);
+  const subtitle = document.querySelector('.subtitle');
+  if (showAll) {
+    subtitle.textContent = 'Showing all items across all networks';
+    subtitle.style.color = 'var(--warning)';
+  } else {
+    subtitle.textContent = 'Drop files or paste text \u2014 shared with everyone on your network';
+    subtitle.style.color = '';
+  }
+  filterAndRender();
+}
+
+function showKeypad() {
+  let existing = document.getElementById('keypad-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'keypad-overlay';
+  overlay.className = 'keypad-overlay';
+  overlay.innerHTML = `
+    <div class="keypad-modal">
+      <div class="keypad-display" id="keypad-display"></div>
+      <div class="keypad-grid">
+        ${[1,2,3,4,5,6,7,8,9,'C',0,'\u232B'].map(k => {
+          const cls = k === 'C' ? 'keypad-key keypad-key-clear' : k === '\u232B' ? 'keypad-key keypad-key-back' : 'keypad-key';
+          return `<button class="${cls}" data-key="${k}">${k}</button>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const display = overlay.querySelector('#keypad-display');
+
+  overlay.addEventListener('click', (e) => {
+    const key = e.target.closest('.keypad-key');
+    if (!key) {
+      if (e.target === overlay) overlay.remove();
+      return;
+    }
+
+    const val = key.dataset.key;
+    if (val === 'C') {
+      display.textContent = '';
+    } else if (val === '\u232B') {
+      display.textContent = display.textContent.slice(0, -1);
+    } else {
+      if (display.textContent.length < 4) {
+        display.textContent += val;
+      }
+    }
+
+    if (display.textContent.length === 4) {
+      const now = new Date();
+      const code = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+      if (display.textContent === code) {
+        overlay.remove();
+        toggleShowAll(true);
+      } else {
+        display.classList.add('keypad-shake');
+        setTimeout(() => {
+          display.classList.remove('keypad-shake');
+          display.textContent = '';
+        }, 400);
+      }
+    }
+  });
+}
 
 async function shareText(){
   const content = textInput.value.trim();

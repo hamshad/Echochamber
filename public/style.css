@@ -13,6 +13,7 @@
   --success:#22c55e;
   --danger:#ef4444;
   --danger-hover:#f87171;
+  --warning:#eab308;
   --file-bg:#1a1a2e;
   --text-bg:#1a2e1a;
   --radius:12px;
@@ -576,4 +577,106 @@ textarea:focus {
 .extend-confirm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+#brand-title {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: text-shadow 0.3s;
+}
+
+#brand-title:active {
+  transform: scale(0.97);
+}
+
+body.show-all-active #brand-title {
+  text-shadow: 0 0 20px var(--warning), 0 0 40px var(--warning);
+  color: var(--warning);
+}
+
+body.show-all-active .item-card {
+  border: 1px solid var(--warning);
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.15);
+}
+
+.keypad-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.keypad-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: 260px;
+}
+
+.keypad-display {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  font-family: 'SF Mono','Fira Code',monospace;
+  font-size: 1.5rem;
+  text-align: center;
+  letter-spacing: 0.5em;
+  min-height: 3rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.keypad-display.keypad-shake {
+  animation: keypadShake 0.4s ease;
+  border-color: var(--danger);
+}
+
+@keyframes keypadShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.keypad-key {
+  padding: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.keypad-key:hover {
+  background: var(--bg-hover);
+}
+
+.keypad-key:active {
+  transform: scale(0.93);
+}
+
+.keypad-key-clear {
+  color: var(--danger);
+}
+
+.keypad-key-back {
+  font-size: 1rem;
 }
