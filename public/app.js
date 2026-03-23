@@ -302,12 +302,12 @@ function renderTextCard(item){
     
     // Add redirect button for first URL (if any)
     if (urls.length > 0) {
-      urlButtons += `<button class="url-btn" onclick="window.open('${urls[0]}', '_blank')" title="Open Link">🔗</button>`;
+      urlButtons += `<button class="url-btn" onclick="window.open('${urls[0]}', '_blank')" title="Open Link"><svg class="icon-lucide icon-link" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>`;
     }
     
     // Add YouTube play button for first YouTube URL (if any)
     if (youtubeUrls.length > 0) {
-      urlButtons += `<button class="youtube-btn" onclick="openYouTubePopup('${youtubeUrls[0].videoId}')" title="Play YouTube Video">▶️</button>`;
+      urlButtons += `<button class="youtube-btn" onclick="openYouTubePopup('${youtubeUrls[0].videoId}')" title="Play YouTube Video"><svg class="icon-lucide icon-play" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`;
     }
     
     urlButtons += '</div>';
@@ -318,9 +318,9 @@ function renderTextCard(item){
       <div class="item-header">
         <span class="item-type text">📝 Text</span>
         <div class="item-actions">
-          <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy">📋</button>
-          <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View">👁</button>
-          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time">⏱</button>
+          <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy"><svg class="icon-lucide icon-copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View"><svg class="icon-lucide icon-eye" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><rect class="eyelid" x="0" y="0" width="24" height="24" rx="0" fill="var(--bg-secondary)" stroke="none"/></svg></button>
+          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           ${urlButtons}
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
@@ -343,7 +343,7 @@ function renderFileCard(item){
       <div class="item-header">
         <span class="item-type file">📎 File</span>
         <div class="item-actions">
-          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time">⏱</button>
+          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
         </div>
       </div>
@@ -361,7 +361,7 @@ function renderFileCard(item){
 window.copyText = async function(id){
   const item = items.find(i => i.id === id);
   if(!item) return;
-  try{ await navigator.clipboard.writeText(item.content); const btn = document.querySelector(`[data-id="${id}"] .btn-icon[title="Copy"]`); if(btn){ btn.textContent = '✓'; setTimeout(()=>btn.textContent='📋',1500); } }catch(err){ console.error('Copy failed:',err); }
+  try{ await navigator.clipboard.writeText(item.content); const btn = document.querySelector(`[data-id="${id}"] .btn-icon[title="Copy"]`); if(btn){ const svg = btn.querySelector('svg'); const origHTML = svg.outerHTML; svg.outerHTML = '<svg class="icon-lucide icon-copy copied" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'; setTimeout(()=>{ const s = btn.querySelector('svg'); if(s) s.outerHTML = origHTML; },1800); } }catch(err){ console.error('Copy failed:',err); }
 };
 
 window.deleteItem = async function(id){
