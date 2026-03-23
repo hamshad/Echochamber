@@ -423,9 +423,15 @@ textarea:focus {
   letter-spacing: 0.04em;
 }
 
-.extend-scroll {
+.extend-scroll-wrap {
+  position: relative;
   width: 72px;
   height: 144px;
+}
+
+.extend-scroll {
+  width: 100%;
+  height: 100%;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
@@ -444,40 +450,41 @@ textarea:focus {
     black 75%,
     transparent 100%
   );
-  position: relative;
   border-radius: var(--radius-sm);
   background: var(--bg-tertiary);
+  cursor: grab;
+}
+
+.extend-scroll:active {
+  cursor: grabbing;
 }
 
 .extend-scroll::-webkit-scrollbar {
   display: none;
 }
 
-.extend-scroll::before,
-.extend-scroll::after {
+.extend-scroll-wrap::before,
+.extend-scroll-wrap::after {
   content: '';
-  position: sticky;
+  position: absolute;
   left: 0;
   right: 0;
-  display: block;
   height: 1px;
   background: var(--border-hover);
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
-.extend-scroll::before {
+.extend-scroll-wrap::before {
   top: 54px;
-  margin-bottom: -1px;
 }
 
-.extend-scroll::after {
-  top: 90px;
-  margin-top: -1px;
+.extend-scroll-wrap::after {
+  bottom: calc(72px - 1px);
 }
 
 .extend-scroll-spacer {
-  height: 54px;
+  height: 72px;
   flex-shrink: 0;
 }
 

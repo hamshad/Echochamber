@@ -601,19 +601,23 @@ window.openExtendDialog = function(itemId, btnEl) {
     <div class="extend-picker">
       <div class="extend-column" data-type="hours">
         <div class="extend-column-label">Hours</div>
-        <div class="extend-scroll">
-          <div class="extend-scroll-spacer"></div>
-          ${Array.from({length: 24}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
-          <div class="extend-scroll-spacer"></div>
+        <div class="extend-scroll-wrap">
+          <div class="extend-scroll">
+            <div class="extend-scroll-spacer"></div>
+            ${Array.from({length: 24}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
+            <div class="extend-scroll-spacer"></div>
+          </div>
         </div>
       </div>
       <div class="extend-separator">:</div>
       <div class="extend-column" data-type="minutes">
         <div class="extend-column-label">Minutes</div>
-        <div class="extend-scroll">
-          <div class="extend-scroll-spacer"></div>
-          ${Array.from({length: 60}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
-          <div class="extend-scroll-spacer"></div>
+        <div class="extend-scroll-wrap">
+          <div class="extend-scroll">
+            <div class="extend-scroll-spacer"></div>
+            ${Array.from({length: 60}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
+            <div class="extend-scroll-spacer"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -638,7 +642,7 @@ window.openExtendDialog = function(itemId, btnEl) {
   document.body.appendChild(dialog);
   extendDialogEl = dialog;
 
-  // Setup scroll snapping
+  // Setup scroll snapping and mouse drag
   const scrolls = dialog.querySelectorAll('.extend-scroll');
   scrolls.forEach(scroll => {
     // Initial scroll to 0 (first item selected)
@@ -649,6 +653,44 @@ window.openExtendDialog = function(itemId, btnEl) {
     scroll.addEventListener('scroll', () => {
       updateSelected(scroll);
     }, { passive: true });
+
+    // Mouse drag scrolling
+    let dragging = false;
+    let startY = 0;
+    let startScrollTop = 0;
+
+    scroll.addEventListener('mousedown', (e) => {
+      dragging = true;
+      startY = e.clientY;
+      startScrollTop = scroll.scrollTop;
+      scroll.style.cursor = 'grabbing';
+      scroll.style.scrollSnapType = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', mouseDragHandler);
+    document.addEventListener('mouseup', mouseUpHandler);
+
+    function mouseDragHandler(e) {
+      if (!dragging || e.target.closest('.extend-scroll') !== scroll && !scroll.contains(e.target)) return;
+      const delta = startY - e.clientY;
+      scroll.scrollTop = startScrollTop + delta;
+    }
+
+    function mouseUpHandler() {
+      if (!dragging) return;
+      dragging = false;
+      scroll.style.cursor = '';
+      scroll.style.scrollSnapType = '';
+      // Re-snap after drag ends
+      snapToNearest(scroll);
+    }
+
+    // Store cleanup refs
+    scroll._cleanupDrag = () => {
+      document.removeEventListener('mousemove', mouseDragHandler);
+      document.removeEventListener('mouseup', mouseUpHandler);
+    };
   });
 
   // Cancel button
@@ -698,6 +740,18 @@ function updateSelected(scroll) {
   });
 }
 
+function snapToNearest(scroll) {
+  const options = scroll.querySelectorAll('.extend-option');
+  if (!options.length) return;
+  const itemHeight = options[0].offsetHeight;
+  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
+  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
+  const nearestIndex = Math.round((scroll.scrollTop - spacerHeight + centerOffset) / itemHeight);
+  const clamped = Math.max(0, Math.min(nearestIndex, options.length - 1));
+  const targetScroll = spacerHeight + clamped * itemHeight - centerOffset;
+  scroll.scrollTo({ top: targetScroll, behavior: 'smooth' });
+}
+
 function getSelectedValue(scroll) {
   const options = scroll.querySelectorAll('.extend-option');
   const scrollTop = scroll.scrollTop;
@@ -717,6 +771,9 @@ function handleOutsideClick(e) {
 function closeExtendDialog() {
   document.removeEventListener('click', handleOutsideClick);
   if (extendDialogEl) {
+    extendDialogEl.querySelectorAll('.extend-scroll').forEach(s => {
+      if (s._cleanupDrag) s._cleanupDrag();
+    });
     extendDialogEl.remove();
     extendDialogEl = null;
     extendItemId = null;
