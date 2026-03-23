@@ -480,11 +480,11 @@ textarea:focus {
 }
 
 .extend-scroll-wrap::after {
-  bottom: calc(72px - 1px);
+  bottom: 54px;
 }
 
 .extend-scroll-spacer {
-  height: 72px;
+  height: 70px;
   flex-shrink: 0;
 }
 
