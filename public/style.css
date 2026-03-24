@@ -47,11 +47,11 @@ textarea:focus{border-color:var(--accent);outline:none}
 .progress-bar{height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
 .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s ease;width:0%}
 
-.items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.items-grid{columns:3 280px;gap:1rem}
 .items-section h2{font-size:1.1rem;font-weight:600;margin-bottom:1rem;color:var(--text-secondary)}
 .item-count{font-weight:400;color:var(--text-tertiary);font-size:.9rem}
 
-.item-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;position:relative;transition:all .2s}
+.item-card{display:inline-block;width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;position:relative;transition:all .2s;break-inside:avoid;margin-bottom:1rem}
 .item-card:hover{border-color:var(--border-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
 .item-card.file{border-left:3px solid var(--accent)}
 .item-card.text{border-left:3px solid var(--success)}
@@ -120,7 +120,7 @@ textarea:focus{border-color:var(--accent);outline:none}
 
 .hidden{display:none!important}
 
-@media(max-width:640px){#app{padding:1rem}.items-grid{grid-template-columns:1fr}h1{font-size:1.5rem}}
+@media(max-width:640px){#app{padding:1rem}.items-grid{columns:1}h1{font-size:1.5rem}}
 
 /* scrollbar */
 ::-webkit-scrollbar{width:6px}
