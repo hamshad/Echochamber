@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!-- ==================================================================
+      LONG DOCUMENT · English · parchment design system
+      Multi-page A4 white paper / tech report / annual review
+      Flow: cover -> toc -> exec summary -> chapters -> appendix
+      ================================================================== -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Echochamber Project Documentation</title>
+<meta name="author" content="Hamshad">
+<meta name="description" content="Technical documentation for Echochamber, a zero-config local network file sharing platform with IP-based access, 1-hour ephemeral storage, and Firebase-powered realtime sync.">
+<meta name="keywords" content="Echochamber, file sharing, local network, IP-based, Firebase, Node.js, ephemeral storage">
+<meta name="generator" content="Kami">
+<style>
+  /* Palatino is a system font, no @font-face needed */
+  @font-face { font-family: "JetBrains Mono"; src: url("/Users/moksha/Moksha/Hamshad/agent_skills/.agents/skills/kami/assets/fonts/JetBrainsMono.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/Users/moksha/Moksha/Hamshad/agent_skills/.agents/skills/kami/assets/fonts/JetBrainsMono.woff2") format("woff2"); font-weight: 500; font-style: normal; }
+
+  @page {
+    size: A4;
+    margin: 20mm 22mm 22mm 22mm;
+    background: #f5f4ed;
+
+    @top-right {
+      content: string(section-title);
+      font-family: Charter, Georgia, Palatino, serif;
+      font-size: 8pt;
+      color: #6b6a64;
+    }
+
+    @bottom-center {
+      content: counter(page) "  ·  Echochamber Project Documentation";
+      font-family: Charter, Georgia, Palatino, serif;
+      font-size: 9pt;
+      color: #6b6a64;
+    }
+  }
+  @page:first {
+    @top-right { content: ""; }
+    @bottom-center { content: ""; }
+  }
+
+  * { box-sizing: border-box; margin:0; padding:0; }
+
+  :root {
+    --parchment: #f5f4ed;
+    --ivory:     #faf9f5;
+    --near-black:#141413;
+    --dark-warm: #3d3d3a;
+    --olive:     #504e49;
+    --stone:     #6b6a64;
+    --brand:     #1B365D;
+    --border:    #e8e6dc;
+    --border-soft:#e5e3d8;
+    --tag-bg:    #E4ECF5;
+
+    --serif: Charter, Georgia,
+             Palatino, "Times New Roman", serif;
+    --sans: var(--serif);
+    --mono:  "JetBrains Mono", "SF Mono", "Fira Code",
+             Consolas, Monaco, monospace;
+  }
+
+  html, body { background: var(--parchment); }
+
+  @media screen {
+    body { max-width: 210mm; margin: 0 auto; padding: 20mm 22mm 22mm 22mm; }
+  }
+
+  body {
+    color: var(--near-black);
+    font-family: var(--serif);
+    font-size: 10.5pt;
+    line-height: 1.55;
+    widows: 3;
+    orphans: 3;
+  }
+
+  .sans { font-family: var(--sans); }
+
+  /* COVER */
+  .cover {
+    min-height: 240mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40mm 0 0 0;
+    break-after: page;
+  }
+  .cover-eyebrow {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--brand);
+    letter-spacing: 2pt;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 18pt;
+  }
+  .cover-title {
+    font-size: 40pt;
+    font-weight: 500;
+    color: var(--near-black);
+    line-height: 1.12;
+    letter-spacing: -0.5pt;
+    margin-bottom: 16pt;
+  }
+  .cover-sub {
+    font-family: var(--sans);
+    font-size: 14pt;
+    color: var(--olive);
+    line-height: 1.45;
+    max-width: 85%;
+    margin-bottom: 30pt;
+  }
+  .cover-meta {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--stone);
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+  }
+  .cover-meta strong { color: var(--dark-warm); font-weight: 500; }
+
+  /* TOC */
+  .toc { break-after: page; }
+  .toc h2 {
+    font-size: 22pt;
+    font-weight: 500;
+    margin-bottom: 14pt;
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+  }
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6pt 0;
+    border-bottom: 0.3pt dotted var(--border);
+    font-size: 11pt;
+  }
+  .toc-item:last-of-type { border-bottom: none; }
+  .toc-num {
+    color: var(--brand);
+    font-weight: 500;
+    min-width: 30pt;
+    font-variant-numeric: tabular-nums;
+  }
+  .toc-title {
+    flex:1;
+    color: var(--near-black);
+    padding-left: 6pt;
+  }
+  .toc-page {
+    color: var(--stone);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* HEADINGS */
+  h1 {
+    font-size: 24pt;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.3pt;
+    margin: 0 0 10pt 0;
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+    color: var(--near-black);
+    break-after: avoid;
+  }
+  h2 {
+    font-size: 16pt;
+    font-weight: 500;
+    line-height: 1.25;
+    margin: 24pt 0 8pt 0;
+    color: var(--near-black);
+    break-after: avoid;
+    string-set: section-title content();
+  }
+  h3 {
+    font-size: 13pt;
+    font-weight: 500;
+    line-height: 1.3;
+    margin: 18pt 0 6pt 0;
+    color: var(--dark-warm);
+    break-after: avoid;
+  }
+
+  .chapter-num {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--brand);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 6pt;
+  }
+
+  /* PARAGRAPHS */
+  p { margin:0 0 10pt 0; line-height: 1.55; color: var(--near-black); widows: 2; orphans: 2; }
+
+  .lead {
+    font-size: 12pt;
+    line-height: 1.55;
+    color: var(--dark-warm);
+    margin-bottom: 14pt;
+  }
+
+  .hl { color: var(--brand); font-weight: 500; }
+  strong { font-weight: 500; }
+
+  /* LISTS */
+  ul, ol {
+    margin: 6pt 0 10pt 0;
+    padding-left: 20pt;
+    line-height: 1.55;
+  }
+  ul li::marker { color: var(--brand); }
+  ol li::marker { color: var(--brand); font-weight: 500; }
+
+  /* QUOTE */
+  blockquote, .quote {
+    border-left: 2pt solid var(--brand);
+    margin: 12pt 0;
+    padding: 4pt 0 4pt 16pt;
+    color: var(--olive);
+    line-height: 1.55;
+    break-inside: avoid;
+  }
+  blockquote .cite, .quote .cite {
+    display: block;
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 4pt;
+  }
+
+  /* CODE */
+  code {
+    font-family: var(--mono);
+    font-size: 9pt;
+    background: var(--ivory);
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+    color: var(--dark-warm);
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 9pt;
+    line-height: 1.5;
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    white-space: pre-wrap;
+    color: var(--near-black);
+    break-inside: avoid;
+  }
+  pre code { background: transparent; padding:0; font-size: inherit; }
+
+  /* TABLE (kami-table) */
+  table, .kami-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 12pt 0;
+    break-inside: avoid;
+  }
+  table th, .kami-table th {
+    text-align: left;
+    font-family: var(--sans);
+    font-weight: 500;
+    color: var(--dark-warm);
+    padding: 6pt 8pt;
+    border-bottom: 1pt solid var(--border);
+    background: var(--ivory);
+  }
+  table td, .kami-table td {
+    padding: 5pt 8pt;
+    border-bottom: 0.3pt solid var(--border-soft);
+    vertical-align: top;
+  }
+  table.compact th, .kami-table.compact th { padding: 3pt 6pt; font-size: 8pt; }
+  table.compact td, .kami-table.compact td { padding: 2pt 6pt; font-size: 8pt; line-height: 1.4; }
+  table.financial td:not(:first-child), .kami-table.financial td:not(:first-child) {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  table.financial th:not(:first-child), .kami-table.financial th:not(:first-child) { text-align: right; }
+  table.striped tbody tr:nth-child(even) td, .kami-table.striped tbody tr:nth-child(even) td {
+    background: var(--ivory);
+  }
+  table .total td, .kami-table .total td {
+    font-weight: 500; border-top: 1pt solid var(--brand); border-bottom: none; color: var(--near-black);
+  }
+
+  /* CALLOUT / TAKEAWAY */
+  .callout {
+    background: var(--ivory);
+    border-left: 2pt solid var(--brand);
+    padding: 10pt 14pt;
+    border-radius: 3pt;
+    margin: 12pt 0;
+    line-height: 1.55;
+    break-inside: avoid;
+  }
+  .callout blockquote,
+  .callout .quote {
+    border-left: none;
+    padding-left: 0;
+    margin: 6pt 0;
+    color: var(--olive);
+  }
+  .callout blockquote:first-child,
+  .callout .quote:first-child { margin-top: 0; }
+  .callout blockquote:last-child,
+  .callout .quote:last-child  { margin-bottom: 0; }
+  .takeaway {
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  .takeaway-label {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--brand);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 4pt;
+  }
+
+  /* TAG */
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--brand);
+    font-family: var(--sans);
+    font-size: 9pt;
+    font-weight: 500;
+    padding: 1pt 6pt;
+    border-radius: 3pt;
+    letter-spacing: 0.4pt;
+    text-transform: uppercase;
+    margin-right: 4pt;
+  }
+
+  /* FIGURE */
+  figure { margin: 14pt 0; break-inside: avoid; }
+  figure img { max-width: 100%; border-radius: 4pt; }
+  figcaption {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 6pt;
+    text-align: center;
+  }
+
+  /* CHAPTER BREAK */
+  .chapter { break-before: page; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<section class="cover">
+  <div>
+    <div class="cover-eyebrow">Project Documentation</div>
+    <div class="cover-title">Echochamber<br>Local Network File Sharing</div>
+    <div class="cover-sub">Zero-config, ephemeral file and text sharing for everyone on your WiFi.</div>
+  </div>
+  <div class="cover-meta">
+    <strong>Hamshad</strong><br>
+    Version 1.0 · 2026.05<br>
+    Self-published
+  </div>
+</section>
+
+<!-- TOC -->
+<section class="toc">
+  <h2>Contents</h2>
+  <div class="toc-item"><span class="toc-num">01</span><span class="toc-title">Executive Summary</span><span class="toc-page">03</span></div>
+  <div class="toc-item"><span class="toc-num">02</span><span class="toc-title">Product Overview</span><span class="toc-page">04</span></div>
+  <div class="toc-item"><span class="toc-num">03</span><span class="toc-title">Technical Architecture</span><span class="toc-page">06</span></div>
+  <div class="toc-item"><span class="toc-num">04</span><span class="toc-title">Deployment Guide</span><span class="toc-page">09</span></div>
+  <div class="toc-item"><span class="toc-num">05</span><span class="toc-title">Appendix</span><span class="toc-page">11</span></div>
+</section>
+
+<!-- Chapter 01 -->
+<section class="chapter">
+  <div class="chapter-num">01 · Executive Summary</div>
+  <h1>Executive Summary</h1>
+
+  <p class="lead">
+    Echochamber is a lightweight, zero-configuration file and text sharing tool designed for local networks. It ties shared content to the user's <span class="hl">public IP address</span>, making files instantly accessible to all devices on the same WiFi network, with automatic 1-hour expiration.
+  </p>
+
+  <h2>Key Takeaways</h2>
+  <ul>
+    <li>Zero-config setup: automatic room discovery via network IP, no account required</li>
+    <li>Ephemeral by default: all items auto-delete after 1 hour to preserve privacy</li>
+    <li>Realtime sync: powered by Firebase for instant updates across all devices</li>
+  </ul>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Questions this document answers</div>
+    <ul>
+      <li>What is Echochamber and how does it work?</li>
+      <li>How to deploy Echochamber on Vercel or self-host?</li>
+      <li>What is the technical stack behind Echochamber?</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Chapter 02 -->
+<section class="chapter">
+  <div class="chapter-num">02 · Product Overview</div>
+  <h1>Product Overview</h1>
+
+  <p class="lead">
+    Echochamber solves the friction of sharing files between devices on the same local network without cloud uploads or account creation.
+  </p>
+
+  <h2>Core Value Proposition</h2>
+  <p>
+    Unlike cloud-based sharing tools, Echochamber operates entirely within your local network. Content is tied to your <span class="hl">public IP address</span>, so only devices on the same network can access shared items, eliminating external privacy risks.
+  </p>
+
+  <h2>Key Features</h2>
+  <ul>
+    <li><strong>Zero Config</strong>: Automatic room discovery via network IP; no manual setup required</li>
+    <li><strong>Ephemeral Storage</strong>: Items live for 1 hour (configurable via TTL_MS) then vanish permanently</li>
+    <li><strong>Private</strong>: No user accounts, no tracking, no cloud storage — all data stays on your local network</li>
+    <li><strong>Realtime Sync</strong>: Instant updates via Firebase Realtime Database and Storage</li>
+    <li><strong>Cross-Platform</strong>: Web-based, works on any device with a browser</li>
+  </ul>
+
+  <h2>Use Cases</h2>
+  <p>
+    Ideal for quick file transfers between colleagues in an office, sharing notes during meetings, or distributing assets to devices on the same WiFi without email or messaging apps.
+  </p>
+</section>
+
+<!-- Chapter 03 -->
+<section class="chapter">
+  <div class="chapter-num">03 · Technical Architecture</div>
+  <h1>Technical Architecture</h1>
+
+  <p class="lead">
+    Echochamber uses a Node.js backend with Firebase as the realtime data and storage layer, deployed as a serverless application on Vercel.
+  </p>
+
+  <h2>Tech Stack</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Technology</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Backend</td><td>Node.js, Express</td></tr>
+      <tr><td>Realtime Database</td><td>Firebase Realtime Database</td></tr>
+      <tr><td>File Storage</td><td>Firebase Storage</td></tr>
+      <tr><td>Deployment</td><td>Vercel (serverless)</td></tr>
+      <tr><td>Frontend</td><td>Vanilla JS, HTML5, CSS3</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Data Flow</h2>
+  <ol>
+    <li>User uploads file or pastes text via the web interface</li>
+    <li>Backend extracts user's public IP address and associates content with it</li>
+    <li>Content is stored in Firebase Storage (files) or Realtime Database (text)</li>
+    <li>TTL timer starts; content auto-deletes after configured duration (default 1 hour)</li>
+    <li>Other devices on the same IP network query Firebase and retrieve available content</li>
+  </ol>
+
+  <h2>Configuration</h2>
+  <p>
+    All configuration is done via environment variables. Required variables include <code>FIREBASE_SERVICE_ACCOUNT</code>, <code>FIREBASE_STORAGE_BUCKET</code>, and <code>FIREBASE_DATABASE_URL</code>. Optional variables like <code>TTL_MS</code> (default 3600000ms / 1 hour) and <code>CLEANUP_INTERVAL_MS</code> (default 60000ms / 60 seconds) tune expiration behavior.
+  </p>
+</section>
+
+<!-- Chapter 04 -->
+<section class="chapter">
+  <div class="chapter-num">04 · Deployment Guide</div>
+  <h1>Deployment Guide</h1>
+
+  <p class="lead">
+    Echochamber can be deployed to Vercel in one click, or self-hosted on any Node.js-compatible server.
+  </p>
+
+  <h2>Hosted Version</h2>
+  <p>
+    The official hosted version is available at <a href="https://echochamber-share.vercel.app/">https://echochamber-share.vercel.app/</a>, maintained by Hamshad. No installation required — visit the URL and start sharing immediately.
+  </p>
+
+  <h2>Self-Hosting on Vercel</h2>
+  <ol>
+    <li>Fork or clone the <a href="https://github.com/hamshad/echochamber">GitHub repository</a></li>
+    <li>Copy <code>.env.example</code> to <code>.env</code> and fill in Firebase credentials</li>
+    <li>Import project to Vercel and set environment variables in project settings</li>
+    <li>Deploy — Vercel will auto-build and serve the application</li>
+  </ol>
+
+  <h2>Self-Hosting (Local)</h2>
+  <pre><code>git clone https://github.com/hamshad/echochamber.git
+cd echochamber
+npm install
+cp .env.example .env
+# Fill .env with your Firebase credentials
+npm start</code></pre>
+  <p>
+    The application will run on port 3000 by default (configurable via <code>PORT</code> environment variable).
+  </p>
+</section>
+
+<!-- Chapter 05 -->
+<section class="chapter">
+  <div class="chapter-num">05 · Appendix</div>
+  <h1>Appendix</h1>
+
+  <h2>A. References</h2>
+  <ul>
+    <li>Echochamber Live Site: <a href="https://echochamber-share.vercel.app/">https://echochamber-share.vercel.app/</a></li>
+    <li>GitHub Repository: <a href="https://github.com/hamshad/echochamber">https://github.com/hamshad/echochamber</a></li>
+    <li>Firebase Documentation: <a href="https://firebase.google.com/docs">https://firebase.google.com/docs</a></li>
+    <li>Vercel Documentation: <a href="https://vercel.com/docs">https://vercel.com/docs</a></li>
+  </ul>
+
+  <h2>B. Glossary</h2>
+  <p><strong>TTL</strong> - Time-to-live: the duration an item remains available before automatic deletion.</p>
+  <p><strong>Realtime Database</strong> - Firebase's NoSQL cloud database that syncs data across all connected clients in real time.</p>
+
+  <h2>C. Acknowledgements</h2>
+  <p>
+    Echochamber was built and is maintained by Hamshad. The project uses Firebase for backend services and Vercel for hosting.
+  </p>
+</section>
+
+</body>
+</html>
