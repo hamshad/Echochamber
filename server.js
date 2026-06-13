@@ -75,7 +75,7 @@ async function getActiveItems(roomId) {
     });
     const allItems = snapshot.val() || {};
     return Object.values(allItems)
-      .filter(i => i.expiresAt > now && (!roomId || i.roomId === roomId))
+      .filter(i => (i.expiresAt === null || i.expiresAt > now) && (!roomId || i.roomId === roomId))
       .sort((a, b) => b.createdAt - a.createdAt);
   } catch (err) {
     console.error('[DB] Failed to fetch items:', err.message);
@@ -138,7 +138,7 @@ app.get('/api/cleanup', async (req, res) => {
     let cleaned = 0;
     for (const id in items) {
       const item = items[id];
-      if (now > item.expiresAt) {
+      if (item.expiresAt !== null && now > item.expiresAt) {
         if (item.type === 'file' && item.filename) {
           bucket.file(item.filename).delete().catch((err) => {
             if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
@@ -280,6 +280,23 @@ app.post('/api/items/:id/extend', async (req, res) => {
   }
 });
 
+// POST /api/items/:id/immortal — make an item never expire
+app.post('/api/items/:id/immortal', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const snapshot = await itemsRef.child(id).once('value');
+    const item = snapshot.val();
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    if (item.expiresAt === null) return res.json({ success: true, expiresAt: null, message: 'Already immortal' });
+    const roomId = getRoomId(req);
+    if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
+    await itemsRef.child(id).update({ expiresAt: null });
+    return res.json({ success: true, expiresAt: null });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to make item immortal' });
+  }
+});
+
 // DELETE /api/items/:id
 app.delete('/api/items/:id', async (req, res) => {
   const id = req.params.id;
@@ -312,7 +329,7 @@ const cleanupTimer = setInterval(async () => {
     let cleaned = 0;
     for (const id in items) {
       const item = items[id];
-      if (now > item.expiresAt) {
+      if (item.expiresAt !== null && now > item.expiresAt) {
         if (item.type === 'file' && item.filename) {
           bucket.file(item.filename).delete().catch((err) => {
             if (err && err.code !== 404) console.error('[Cleanup] Firebase delete error:', err && err.message);
@@ -341,8 +358,10 @@ function getLocalIPs() {
   return ips;
 }
 
-function shutdown() {
-  console.log('\n[Server] Shutting down...');
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n[Server] Shutting down...`);
+  console.log(`[Server] Shutdown triggered by signal: ${signal}`);
   clearInterval(cleanupTimer);
   server.close(() => {
     console.log('[Server] Goodbye!');
@@ -350,8 +369,11 @@ function shutdown() {
   });
   setTimeout(() => process.exit(0), 5000);
 }
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+// Only set up shutdown handlers in non-test environments
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
 
 // Only start listening when run directly (not when imported by tests)
 // Vercel sets process.env.VERCEL, and usually runs the script via its own runner.
