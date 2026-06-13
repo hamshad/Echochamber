@@ -383,34 +383,73 @@ function renderItems(newItems){
 }
 
 function syncDom(oldItems, newItems) {
-  // Rebuild masonry columns from scratch for clean left-to-right flow
-  itemsGrid.innerHTML = '';
-  
+  const oldMap = {};
+  const allCards = itemsGrid.querySelectorAll('.item-card');
+  allCards.forEach(c => {
+    const id = c.getAttribute('data-id');
+    if (id) oldMap[id] = c;
+  });
+
+  const newIds = new Set(newItems.map(i => i.id));
   const COLS = window.innerWidth <= 640 ? 1 : 2;
-  const cols = [];
-  const colHeights = [];
-  for (let i = 0; i < COLS; i++) {
-    const col = document.createElement('div');
-    col.className = 'masonry-col';
-    itemsGrid.appendChild(col);
-    cols.push(col);
-    colHeights.push(0);
-  }
+  const cols = Array.from(itemsGrid.querySelectorAll('.masonry-col'));
 
-  newItems.forEach((item) => {
-    const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
-    const temp = document.createElement('div');
-    temp.innerHTML = cardHtml.trim();
-    const newElem = temp.firstChild;
-    newElem.style.viewTransitionName = `card-${item.id}`;
-
-    // Find shortest column
-    let shortest = 0;
-    for (let i = 1; i < COLS; i++) {
-      if (colHeights[i] < colHeights[shortest]) shortest = i;
+  // Remove deleted cards
+  allCards.forEach(c => {
+    const id = c.getAttribute('data-id');
+    if (!newIds.has(id) && !c.classList.contains('deleting')) {
+      c.remove();
     }
-    cols[shortest].appendChild(newElem);
-    colHeights[shortest] += newElem.offsetHeight || 200;
+  });
+
+  // Build cards array: re-use existing, create new
+  const cardElements = newItems.map(item => {
+    const existing = oldMap[item.id];
+    if (existing) {
+      // Update existing card footer
+      const isImmortal = item.expiresAt >= 9000000000000000;
+      const timeLeft = getTimeLeft(item.expiresAt);
+      const expiresSoon = !isImmortal && (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+      const footer = existing.querySelector('.item-footer');
+      if (footer) {
+        const timeHtml = isImmortal
+          ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal'
+          : '⏱ ' + timeLeft;
+        footer.innerHTML = `<span class="item-time${isImmortal ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${timeHtml}</span>${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}`;
+      }
+      if (isImmortal) existing.classList.add('immortal');
+      else existing.classList.remove('immortal');
+      return existing;
+    } else {
+      const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
+      const temp = document.createElement('div');
+      temp.innerHTML = cardHtml.trim();
+      const newCard = temp.firstChild;
+      newCard.style.viewTransitionName = `card-${item.id}`;
+      return newCard;
+    }
+  });
+
+  // Clear all cards from columns (detach, don't destroy)
+  cols.forEach(col => {
+    while (col.firstChild) col.removeChild(col.firstChild);
+  });
+
+  // Redistribute all cards into columns by shortest height
+  const colHeights = [0, 0];
+  cardElements.forEach((card, i) => {
+    const item = newItems[i];
+    if (!item) return;
+    const isNew = !oldMap[item.id];
+    let shortest = 0;
+    for (let c = 1; c < COLS; c++) {
+      if (colHeights[c] < colHeights[shortest]) shortest = c;
+    }
+    cols[shortest].appendChild(card);
+    colHeights[shortest] += card.offsetHeight || 200;
+    if (isNew) {
+      card.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+    }
   });
 }
 
@@ -516,7 +555,13 @@ window.deleteItem = async function(id){
     
     // We let the syncDom handle the actual removal, or we can clean up here
     setTimeout(() => {
-      if (card.parentNode) card.remove();
+      if (card.parentNode) {
+        if (document.startViewTransition) {
+          document.startViewTransition(() => card.remove());
+        } else {
+          card.remove();
+        }
+      }
     }, 450);
   } catch (err) {
     console.error('Delete failed:', err);
@@ -545,6 +590,47 @@ window.immortalItem = async function(id, btnEl){
     if (item) item.expiresAt = data.expiresAt;
     // Trigger burst animation
     card.classList.add('immortal-burst');
+    // Flash overlay
+    const flash = document.createElement('div');
+    flash.className = 'immortal-flash';
+    card.appendChild(flash);
+    setTimeout(() => flash.remove(), 800);
+    // Multi-layer glow
+    const glow = document.createElement('div');
+    glow.className = 'immortal-glow';
+    card.appendChild(glow);
+    setTimeout(() => glow.remove(), 1800);
+    // Energy wave rings
+    for (let i = 0; i < 4; i++) {
+      const wave = document.createElement('div');
+      wave.className = 'immortal-wave-ring';
+      wave.style.animationDelay = `${60 + i * 120}ms`;
+      card.appendChild(wave);
+      setTimeout(() => wave.remove(), 1500);
+    }
+    // Golden spark particles
+    const pw = card.offsetWidth;
+    const ph = card.offsetHeight;
+    const colors = ['#c4940a', '#fff8e1', '#ffe082', '#ffd54f', '#ffffff'];
+    for (let i = 0; i < 30; i++) {
+      const spark = document.createElement('div');
+      spark.className = 'immortal-spark';
+      const size = 2 + Math.random() * 5;
+      spark.style.width = size + 'px';
+      spark.style.height = size + 'px';
+      spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 30 + Math.random() * 140;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      spark.style.left = (pw / 2) + 'px';
+      spark.style.top = (ph / 2) + 'px';
+      spark.style.transform = `translate(${dx - size/2}px, ${dy - size/2}px)`;
+      spark.style.animationDelay = (Math.random() * 300) + 'ms';
+      spark.style.animationDuration = (1500 + Math.random() * 800) + 'ms';
+      card.appendChild(spark);
+      setTimeout(() => spark.remove(), 3000);
+    }
     // Update button to active state
     btnEl.classList.add('active');
     btnEl.removeAttribute('onclick');
@@ -559,8 +645,8 @@ window.immortalItem = async function(id, btnEl){
       }
     }
     // Add immortal class after burst
-    setTimeout(() => { card.classList.add('immortal'); }, 300);
-    setTimeout(() => { card.classList.remove('immortal-burst'); }, 800);
+    setTimeout(() => { card.classList.add('immortal'); }, 600);
+    setTimeout(() => { card.classList.remove('immortal-burst'); }, 1600);
   } catch (err) {
     console.error('Immortal failed:', err);
   }

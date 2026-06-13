@@ -625,13 +625,90 @@ body.show-all-active .item-card .item-type{color:var(--warning)!important}
   border-left:5px solid var(--warning)!important;
 }
 .item-card.immortal .item-type{color:var(--warning)!important}
-.item-card.immortal-burst{animation:immortalBurst 0.8s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes immortalBurst{
-  0%{transform:scale(1);box-shadow:0 0 0 0 rgba(149,100,0,0)}
-  20%{transform:scale(1.03);box-shadow:0 0 20px 4px rgba(149,100,0,0.2)}
-  40%{transform:scale(1.05);box-shadow:0 0 30px 8px rgba(149,100,0,0.15)}
-  60%{transform:scale(1.03);box-shadow:0 0 20px 4px rgba(149,100,0,0.1)}
-  100%{transform:scale(1);box-shadow:0 0 0 rgba(149,100,0,0)}
+.item-card.immortal-burst{
+  position:relative;z-index:1;overflow:visible;
+  animation:immortalImpact 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.immortal-flash{
+  position:absolute;inset:-15px;border-radius:var(--radius);
+  pointer-events:none;z-index:10;
+  background:radial-gradient(circle at center, #fff8e1 0%, #ffe082 20%, rgba(196,148,10,0.4) 40%, transparent 60%);
+  animation:immortalFlashAnim 0.6s ease-out forwards;
+}
+@keyframes immortalFlashAnim{
+  0%{opacity:0;transform:scale(0.8)}
+  15%{opacity:1;transform:scale(1.05)}
+  40%{opacity:0.6;transform:scale(1.12)}
+  100%{opacity:0;transform:scale(1.35)}
+}
+.immortal-glow{
+  position:absolute;inset:0;border-radius:var(--radius);
+  pointer-events:none;z-index:3;
+  animation:immortalGlowAnim 1.5s ease-out forwards;
+}
+@keyframes immortalGlowAnim{
+  0%{box-shadow:0 0 0 0 rgba(196,148,10,0),0 0 0 0 rgba(255,224,130,0),inset 0 0 0 0 rgba(255,224,130,0)}
+  12%{box-shadow:0 0 35px 15px rgba(196,148,10,0.8),0 0 80px 30px rgba(255,224,130,0.5),inset 0 0 40px 12px rgba(255,224,130,0.3)}
+  35%{box-shadow:0 0 25px 10px rgba(196,148,10,0.5),0 0 55px 20px rgba(255,224,130,0.3),inset 0 0 25px 6px rgba(255,224,130,0.15)}
+  65%{box-shadow:0 0 12px 4px rgba(196,148,10,0.15),0 0 20px 6px rgba(255,224,130,0.08),inset 0 0 8px 2px rgba(255,224,130,0.05)}
+  100%{box-shadow:0 0 4px 1px rgba(196,148,10,0.06),0 0 0 0 rgba(255,224,130,0),inset 0 0 0 0 rgba(255,224,130,0)}
+}
+.immortal-wave-ring{
+  position:absolute;inset:-2px;border-radius:var(--radius);
+  pointer-events:none;z-index:4;border:2.5px solid;
+  animation:immortalWaveAnim 0.9s ease-out forwards;
+}
+@keyframes immortalWaveAnim{
+  0%{transform:scale(1);opacity:0.9;border-color:#c4940a}
+  30%{opacity:0.5;border-color:#c4940a}
+  60%{opacity:0.15;border-color:#ffe082}
+  100%{transform:scale(1.3);opacity:0;border-color:transparent}
+}
+.immortal-spark{
+  position:absolute;border-radius:50%;pointer-events:none;z-index:15;
+  animation:immortalSparkAnim 1.8s ease-out forwards;
+}
+@keyframes immortalSparkAnim{
+  0%{opacity:0;transform:scale(0)}
+  8%{opacity:1;transform:scale(2)}
+  20%{opacity:0.4;transform:scale(0.8)}
+  35%{opacity:0.9;transform:scale(1.5)}
+  50%{opacity:0.1;transform:scale(0.4)}
+  65%{opacity:0.6;transform:scale(0.7)}
+  80%{opacity:0.2;transform:scale(0.3)}
+  100%{opacity:0;transform:scale(0)}
+}
+@keyframes immortalImpact{
+  0%{transform:scale(1)}
+  10%{transform:scale(1.08) translateY(-2px)}
+  22%{transform:scale(1.05) translateY(1px)}
+  38%{transform:scale(1.02)}
+  60%{transform:scale(1.005)}
+  100%{transform:scale(1)}
+}
+@keyframes immortalShake{
+  0%{transform:translateX(0) scale(1)}
+  5%{transform:translateX(-3px) scale(1.005)}
+  10%{transform:translateX(4px) scale(1.02)}
+  15%{transform:translateX(-5px) scale(1.035)}
+  20%{transform:translateX(5px) scale(1.04)}
+  25%{transform:translateX(-4px) scale(1.035)}
+  35%{transform:translateX(3px) scale(1.03)}
+  45%{transform:translateX(-2px) scale(1.02)}
+  55%{transform:translateX(2px) scale(1.015)}
+  65%{transform:translateX(-1px) scale(1.01)}
+  80%{transform:translateX(0.5px) scale(1.005)}
+  100%{transform:translateX(0) scale(1)}
+}
+.immortal-wave-ring{
+  position:absolute;inset:-4px;border-radius:var(--radius);
+  border:2px solid var(--warning);pointer-events:none;z-index:-1;
+  animation:immortalWave 1.4s ease-out forwards;
+}
+@keyframes immortalWave{
+  0%{transform:scale(1);opacity:0.9;border-color:var(--warning)}
+  60%{opacity:0.3;border-color:var(--warning)}
+  100%{transform:scale(1.2);opacity:0;border-color:transparent}
 }
 .item-time.immortal-time{color:var(--warning);font-weight:600;letter-spacing:0.02em;display:inline-flex;align-items:center;gap:0.3rem}
 .icon-infinite-inline{animation:infinitePulse 2s ease-in-out infinite;vertical-align:middle}
