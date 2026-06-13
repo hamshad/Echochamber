@@ -1031,4 +1031,26 @@ function closeExtendDialog() {
   }
 }
 
+function initParticles() {
+  const container = document.getElementById('particles-bg');
+  if (!container) return;
+  const count = 100;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    const size = 2 + Math.random() * 7;
+    const duration = 18 + Math.random() * 22;
+    el.style.cssText = `
+      left:${Math.random() * 100}%;width:${size}px;height:${size}px;
+      animation-duration:${duration}s;
+      animation-delay:${Math.random() * 10}s;
+      --dx:${(Math.random() - 0.5) * 40}vw;
+      --dy:${-100 - Math.random() * 40}vh;
+      --o:${0.3 + Math.random() * 0.7};
+    `;
+    container.appendChild(el);
+  }
+}
+initParticles();
+
 setInterval(()=>{ try{ renderItems(); }catch(e){} },30000);

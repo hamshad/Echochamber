@@ -19,6 +19,7 @@
   --warning-bg:#FBF3DB;
   --info:#4A9AD4;
   --info-bg:#E1F3FE;
+  --particle-color:#cf3e30;
   --radius:8px;
   --radius-sm:6px;
   --radius-xs:4px;
@@ -46,6 +47,7 @@
   --warning-bg:rgba(251,191,36,0.12);
   --info:#60a5fa;
   --info-bg:rgba(96,165,250,0.12);
+  --particle-color:#f59e0b;
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -65,7 +67,7 @@ body{
 }
 .skip-link:focus{top:0.5rem}
 
-#app{max-width:1100px;margin:0 auto;padding:4rem 3rem 5rem}
+#app{max-width:1100px;margin:0 auto;padding:4rem 3rem 5rem;position:relative;z-index:1}
 
 /* ========== HEADER ========== */
 header{text-align:center;margin-bottom:4rem;position:relative}
@@ -545,24 +547,80 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
 
 body.show-all-active #brand-title{
   color:var(--warning);
-  animation:goldenPulse 2s ease-in-out infinite;
+  animation:goldenPulse 2s ease-in-out infinite, titleBurn 1.5s ease-in-out infinite;
 }
 @keyframes goldenPulse{
   0%,100%{filter:brightness(1)}
   50%{filter:brightness(1.15)}
 }
+@keyframes titleBurn{
+  0%,100%{text-shadow:0 0 0 transparent}
+  15%{text-shadow:0 0 8px rgba(255,100,0,0.6),0 0 20px rgba(255,50,0,0.3)}
+  30%{text-shadow:0 0 4px rgba(255,150,0,0.3)}
+  45%{text-shadow:0 0 12px rgba(255,80,0,0.5),0 0 30px rgba(255,30,0,0.2)}
+  60%{text-shadow:0 0 3px rgba(255,120,0,0.2)}
+  75%{text-shadow:0 0 10px rgba(255,60,0,0.7),0 0 25px rgba(255,0,0,0.3)}
+  90%{text-shadow:0 0 2px rgba(255,100,0,0.15)}
+}
+body.show-all-active .subtitle{
+  animation:textBurn 1.8s ease-in-out infinite;
+  font-weight:500;
+}
+@keyframes textBurn{
+  0%,100%{text-shadow:0 0 0 transparent;color:var(--warning)}
+  20%{text-shadow:0 0 5px rgba(255,100,0,0.5),0 0 12px rgba(255,50,0,0.2);color:#ff6b00}
+  40%{text-shadow:0 0 3px rgba(255,150,0,0.3);color:#e68500}
+  60%{text-shadow:0 0 8px rgba(255,80,0,0.4),0 0 18px rgba(255,30,0,0.15);color:#ff4400}
+  80%{text-shadow:0 0 2px rgba(255,120,0,0.2);color:var(--warning)}
+}
 body.show-all-active .item-card{
   border-color:var(--warning);
-  animation:goldenCardPulse 3s ease-in-out infinite;
+  animation:goldenCardPulse 3s ease-in-out infinite, cardBurn 2.5s ease-in-out infinite;
 }
-body.show-all-active .item-card:nth-child(odd){animation-delay:0.5s}
+body.show-all-active .item-card:nth-child(odd){animation-delay:0.5s,0.4s}
 @keyframes goldenCardPulse{
   0%,100%{box-shadow:0 0 0 rgba(149,100,0,0)}
   50%{box-shadow:0 0 12px rgba(149,100,0,0.12)}
 }
+@keyframes cardBurn{
+  0%,100%{border-color:var(--warning)}
+  20%{border-color:#ff6b00}
+  40%{border-color:var(--warning)}
+  60%{border-color:#ff4400}
+  80%{border-color:#e68500}
+}
 body.show-all-active .item-card .item-type{color:var(--warning)!important}
 
-/* ========== KEYPAD ========== */
+/* Earthquake */
+body.show-all-active #app{
+  animation:earthquake 1s ease-out;
+  transform-origin:center center;
+}
+@keyframes earthquake{
+  0%,100%{transform:translate(0,0)}
+  8%{transform:translate(-8px,4px)}
+  16%{transform:translate(6px,-6px)}
+  24%{transform:translate(-10px,-3px)}
+  32%{transform:translate(7px,5px)}
+  40%{transform:translate(-5px,-4px)}
+  48%{transform:translate(9px,3px)}
+  56%{transform:translate(-4px,6px)}
+  64%{transform:translate(6px,-5px)}
+  72%{transform:translate(-7px,2px)}
+  80%{transform:translate(5px,-3px)}
+  88%{transform:translate(-6px,4px)}
+  94%{transform:translate(3px,-2px)}
+}
+
+body.show-all-active .item-card{
+  border-color:var(--warning);
+  animation:cardFadeIn 1.5s ease-out, goldenCardPulse 3s ease-in-out infinite, cardBurn 2.5s ease-in-out infinite;
+}
+body.show-all-active .item-card:nth-child(odd){animation-delay:0s,0.5s,0.4s}
+@keyframes cardFadeIn{
+  0%{opacity:0;transform:translateY(8px)}
+  100%{opacity:1;transform:translateY(0)}
+}
 .keypad-overlay{
   position:fixed;inset:0;background:rgba(17,17,17,0.4);
   display:flex;align-items:center;justify-content:center;
@@ -846,6 +904,25 @@ textarea:not(:focus){box-shadow:none}
 .text-modal-backdrop{animation:fadeIn 0.2s ease-out}
 .text-modal-panel{
   animation:modalIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+
+/* ========== PARTICLES (easter egg) ========== */
+#particles-bg{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  overflow:hidden;display:none;
+}
+body.show-all-active #particles-bg{display:block}
+.particle{
+  position:absolute;bottom:-2px;border-radius:50%;
+  background:radial-gradient(circle at center, var(--particle-color), var(--particle-color) 10%, transparent 56%);
+  mix-blend-mode:screen;
+  animation:particleFloat linear infinite;
+}
+@keyframes particleFloat{
+  0%{transform:translate3d(0,0,0);opacity:0}
+  5%{opacity:var(--o,0.6)}
+  90%{opacity:var(--o,0.6)}
+  100%{transform:translate3d(var(--dx,0),var(--dy,-120vh),0);opacity:0}
 }
 
 /* End of styles */
