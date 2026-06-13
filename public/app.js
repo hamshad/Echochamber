@@ -22,6 +22,47 @@ function initTheme() {
 }
 initTheme();
 
+// Random quote
+function loadQuote() {
+  const el = document.getElementById('daily-quote');
+  if (!el) return;
+  const useKanye = Math.random() < 0.2;
+  const useDadJoke = !useKanye && Math.random() < 0.15;
+  let url, parser;
+  if (useKanye) {
+    url = 'https://api.kanye.rest/';
+    parser = data => ({ text: data.quote, char: 'Kanye West' });
+  } else if (useDadJoke) {
+    url = 'https://icanhazdadjoke.com/';
+    parser = data => ({ text: data.joke, char: 'Dad Joke' });
+  } else {
+    url = 'https://api.animechan.io/v1/quotes/random';
+    parser = data => {
+      if (data.status === 'success' && data.data) {
+        return { text: data.data.content, char: `${data.data.character.name}, ${data.data.anime.name}` };
+      }
+      return null;
+    };
+  }
+  fetch(url, { headers: useDadJoke ? { 'Accept': 'application/json' } : {} })
+    .then(r => {
+      if (r.status === 429) {
+        return fetch('https://icanhazdadjoke.com/', { headers: { 'Accept': 'application/json' } })
+          .then(r2 => r2.json())
+          .then(data => ({ text: data.joke, char: 'Dad Joke' }));
+      }
+      return r.json().then(parser);
+    })
+    .then(result => {
+      if (result && result.text) {
+        el.innerHTML = `"${result.text}" <span class="quote-char">— ${result.char}</span>`;
+        el.classList.add('visible');
+      }
+    })
+    .catch(() => {});
+}
+loadQuote();
+
 let db;
 let items = [];
 let myIp = null; // Will be set from server
