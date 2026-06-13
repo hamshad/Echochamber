@@ -349,9 +349,10 @@ function syncDom(oldItems, newItems) {
       const footer = existing.querySelector('.item-footer');
       if (footer) {
         const timeLeft = getTimeLeft(item.expiresAt);
-        const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
+        const isImmortal = item.expiresAt >= 9000000000000000;
+        const expiresSoon = !isImmortal && (item.expiresAt - Date.now()) < 10 * 60 * 1000;
         footer.innerHTML = `
-          <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+          <span class="item-time${isImmortal ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${isImmortal ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
           ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
         `;
       }
@@ -418,11 +419,12 @@ function renderTextCard(item){
           <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           ${urlButtons}
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+          <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="text-content">${escapeHtml(item.content)}</div>
       <div class="item-footer">
-        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
         <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
       </div>
     </div>
@@ -440,6 +442,7 @@ function renderFileCard(item){
         <div class="item-actions">
           <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+          <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="file-name">${escapeHtml(item.originalName)}</div>
@@ -447,7 +450,7 @@ function renderFileCard(item){
       <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')">⬇ Download</button>
       ${optimisticNote}
       <div class="item-footer">
-        <span class="item-time ${expiresSoon ? 'expires-soon' : ''}">⏱ ${timeLeft}</span>
+        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
       </div>
     </div>
   `;
@@ -498,6 +501,39 @@ window.deleteItem = async function(id){
 };
 
 window.downloadFile = function(id){ window.open(`/api/download/${id}`,'_blank'); };
+
+window.immortalItem = async function(id, btnEl){
+  const card = document.querySelector(`[data-id="${id}"]`);
+  if (!card) return;
+  try {
+    const res = await fetch(`/api/items/${id}/immortal`, { method: 'POST' });
+    if (!res.ok) throw new Error('Immortal failed');
+    const data = await res.json();
+    // Update local state
+    const item = cachedAllItems.find(i => i.id === id);
+    if (item) item.expiresAt = data.expiresAt;
+    // Trigger burst animation
+    card.classList.add('immortal-burst');
+    // Update button to active state
+    btnEl.classList.add('active');
+    btnEl.removeAttribute('onclick');
+    btnEl.title = 'Immortal';
+    // Update footer
+    const footer = card.querySelector('.item-footer');
+    if (footer) {
+      const timeSpan = footer.querySelector('.item-time');
+      if (timeSpan) {
+        timeSpan.className = 'item-time immortal-time';
+        timeSpan.textContent = '♾️ Immortal';
+      }
+    }
+    // Add immortal class after burst
+    setTimeout(() => { card.classList.add('immortal'); }, 300);
+    setTimeout(() => { card.classList.remove('immortal-burst'); }, 800);
+  } catch (err) {
+    console.error('Immortal failed:', err);
+  }
+};
 
 // Modal handling
 const textModal = document.getElementById('text-modal');

@@ -280,6 +280,24 @@ app.post('/api/items/:id/extend', async (req, res) => {
   }
 });
 
+// POST /api/items/:id/immortal — make an item never expire
+app.post('/api/items/:id/immortal', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const snapshot = await itemsRef.child(id).once('value');
+    const item = snapshot.val();
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    if (item.expiresAt >= 9000000000000000) return res.json({ success: true, expiresAt: item.expiresAt, message: 'Already immortal' });
+    const roomId = getRoomId(req);
+    if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
+    const IMMORTAL = 9007199254740991; // Number.MAX_SAFE_INTEGER
+    await itemsRef.child(id).update({ expiresAt: IMMORTAL });
+    return res.json({ success: true, expiresAt: IMMORTAL });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to make item immortal' });
+  }
+});
+
 // DELETE /api/items/:id
 app.delete('/api/items/:id', async (req, res) => {
   const id = req.params.id;
