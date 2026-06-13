@@ -2,6 +2,26 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
 import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
 
+// Theme switching
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  });
+}
+initTheme();
+
 let db;
 let items = [];
 let myIp = null; // Will be set from server
@@ -322,64 +342,34 @@ function renderItems(newItems){
 }
 
 function syncDom(oldItems, newItems) {
-  const oldIds = new Set(oldItems.map(i => i.id));
-  const newIds = new Set(newItems.map(i => i.id));
+  // Rebuild masonry columns from scratch for clean left-to-right flow
+  itemsGrid.innerHTML = '';
   
-  // Remove items that are no longer present
-  Array.from(itemsGrid.children).forEach(child => {
-    const id = child.getAttribute('data-id');
-    if (!newIds.has(id)) {
-      // If it's already marked as deleting, we let that animation handle it
-      if (child.classList.contains('deleting')) return;
+  const COLS = window.innerWidth <= 640 ? 1 : 2;
+  const cols = [];
+  const colHeights = [];
+  for (let i = 0; i < COLS; i++) {
+    const col = document.createElement('div');
+    col.className = 'masonry-col';
+    itemsGrid.appendChild(col);
+    cols.push(col);
+    colHeights.push(0);
+  }
 
-      child.style.transform = 'scale(0.8) translateY(20px)';
-      child.style.opacity = '0';
-      setTimeout(() => child.remove(), 300);
-    }
-  });
-
-  // Update or Add items
-  newItems.forEach((item, index) => {
-    let existing = itemsGrid.querySelector(`[data-id="${item.id}"]`);
+  newItems.forEach((item) => {
     const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
-    
-    if (existing) {
-      // Update existing content if needed (e.g. time left)
-      // We do a lightweight update to avoid flickering
-      const footer = existing.querySelector('.item-footer');
-      if (footer) {
-        const timeLeft = getTimeLeft(item.expiresAt);
-        const isImmortal = item.expiresAt >= 9000000000000000;
-        const expiresSoon = !isImmortal && (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-        footer.innerHTML = `
-          <span class="item-time${isImmortal ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${isImmortal ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
-          ${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}
-        `;
-      }
-    } else {
-      // Create new element
-      const temp = document.createElement('div');
-      temp.innerHTML = cardHtml.trim();
-      const newElem = temp.firstChild;
-      
-      // Set view-transition-name for the browser to track this specific card
-      newElem.style.viewTransitionName = `card-${item.id}`;
-      
-      // If it's the very first render or we are adding to the top
-      if (index === 0) {
-        itemsGrid.prepend(newElem);
-      } else {
-        const children = itemsGrid.children;
-        if (children[index]) {
-          itemsGrid.insertBefore(newElem, children[index]);
-        } else {
-          itemsGrid.appendChild(newElem);
-        }
-      }
-      
-      // Trigger entrance animation for new element
-      newElem.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+    const temp = document.createElement('div');
+    temp.innerHTML = cardHtml.trim();
+    const newElem = temp.firstChild;
+    newElem.style.viewTransitionName = `card-${item.id}`;
+
+    // Find shortest column
+    let shortest = 0;
+    for (let i = 1; i < COLS; i++) {
+      if (colHeights[i] < colHeights[shortest]) shortest = i;
     }
+    cols[shortest].appendChild(newElem);
+    colHeights[shortest] += newElem.offsetHeight || 200;
   });
 }
 
@@ -410,21 +400,21 @@ function renderTextCard(item){
   }
   
   return `
-    <div class="item-card text" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+    <div class="item-card text${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}" style="view-transition-name: card-${item.id}">
       <div class="item-header">
-        <span class="item-type text">📝 Text</span>
+        <span class="item-type text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Text</span>
         <div class="item-actions">
           <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy"><svg class="icon-lucide icon-copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-          <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View"><svg class="icon-lucide icon-eye" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><rect class="eyelid" x="0" y="0" width="24" height="24" rx="0" fill="var(--bg-secondary)" stroke="none"/></svg></button>
+          <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View"><svg class="icon-lucide icon-eye" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><rect class="eyelid" x="0" y="0" width="24" height="24" rx="0" fill="var(--surface)" stroke="none"/></svg></button>
           <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           ${urlButtons}
-          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="text-content">${escapeHtml(item.content)}</div>
       <div class="item-footer">
-        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
+        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal' : '⏱ ' + timeLeft}</span>
         <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
       </div>
     </div>
@@ -436,21 +426,21 @@ function renderFileCard(item){
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
   return `
-    <div class="item-card file" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+    <div class="item-card file${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}" style="view-transition-name: card-${item.id}">
       <div class="item-header">
-        <span class="item-type file">📎 File</span>
+        <span class="item-type file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> File</span>
         <div class="item-actions">
           <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
-          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete">✕</button>
+          <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="file-name">${escapeHtml(item.originalName)}</div>
       <div class="file-size">${formatFileSize(item.size)}</div>
-      <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')">⬇ Download</button>
+      <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
       ${optimisticNote}
       <div class="item-footer">
-        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '♾️ Immortal' : '⏱ ' + timeLeft}</span>
+        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal' : '⏱ ' + timeLeft}</span>
       </div>
     </div>
   `;
@@ -524,7 +514,7 @@ window.immortalItem = async function(id, btnEl){
       const timeSpan = footer.querySelector('.item-time');
       if (timeSpan) {
         timeSpan.className = 'item-time immortal-time';
-        timeSpan.textContent = '♾️ Immortal';
+        timeSpan.innerHTML = '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal';
       }
     }
     // Add immortal class after burst
@@ -622,7 +612,7 @@ function closeTextModal(){
   const body = document.querySelector('.text-modal-body');
   if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
   // reset buttons and state
-  if (modalCopyBtn) modalCopyBtn.textContent = '📋';
+  if (modalCopyBtn) modalCopyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   if (modalSaveBtn) modalSaveBtn.disabled = true;
   textModal.classList.add('hidden');
   modalEditingId = null;
@@ -635,7 +625,7 @@ modalCopyBtn.addEventListener('click', async ()=>{
     const preview = document.getElementById('modal-preview');
     const text = preview ? preview.textContent : (modalTextarea ? modalTextarea.value : '');
     await navigator.clipboard.writeText(text);
-    modalCopyBtn.textContent = '✓'; setTimeout(()=>modalCopyBtn.textContent='📋',1200);
+    modalCopyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'; setTimeout(()=>modalCopyBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',1200);
   } catch(e){ console.error(e); }
 });
 

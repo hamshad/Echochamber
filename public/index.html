@@ -3,7 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Echochamber</title>
+    <title>Echochamber — local network file & text sharing</title>
+    <meta name="description" content="Drop files or paste text and share them instantly with everyone on your local network. No account needed." />
+    <meta name="theme-color" content="#FBFBFA" />
+    <meta property="og:title" content="Echochamber" />
+    <meta property="og:description" content="Local network file and text sharing. Drop, share, done." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/style.css" />
     <script type="importmap">
       {
@@ -16,6 +22,7 @@
     <script src="/app.js" type="module" defer></script>
   </head>
   <body>
+    <a href="#text-input" class="skip-link">Skip to content</a>
     <div id="app">
       <header>
         <h1 id="brand-title">Echochamber</h1>
@@ -29,17 +36,25 @@
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.263.82-.583 0-.288-.01-1.05-.015-2.06-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.758-1.333-1.758-1.09-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.605-2.665-.305-5.467-1.335-5.467-5.93 0-1.31.467-2.38 1.235-3.22-.123-.304-.535-1.527.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 013.003-.403c1.02.005 2.045.138 3.003.403 2.29-1.552 3.296-1.23 3.296-1.23.653 1.65.241 2.873.119 3.176.77.84 1.234 1.91 1.234 3.22 0 4.61-2.807 5.624-5.48 5.92.43.37.814 1.103.814 2.222 0 1.606-.015 2.902-.015 3.297 0 .322.216.702.825.582C20.565 21.796 24 17.298 24 12 24 5.37 18.63 0 12 0z"/>
           </svg>
         </a>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle theme" aria-label="Toggle dark mode">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </header>
 
-      <section class="input-section">
+      <main>
+      <section class="input-section" aria-label="Share content">
         <div class="text-input-wrapper">
-          <textarea id="text-input" placeholder="Paste text, keys, code snippets..." rows="4"></textarea>
-          <button id="share-text-btn" class="btn btn-primary">Share Text</button>
+          <textarea id="text-input" placeholder="Paste text, keys, code snippets..." rows="4" aria-label="Text to share"></textarea>
+          <button id="share-text-btn" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share Text
+          </button>
         </div>
 
         <div class="file-upload-wrapper">
           <label class="file-upload-label" for="file-input">
-            <span class="upload-icon">📁</span>
+            <svg class="upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Choose files or drag & drop anywhere</span>
           </label>
           <input type="file" id="file-input" multiple hidden />
@@ -53,7 +68,7 @@
         <span id="progress-text">Uploading...</span>
       </div>
 
-      <section class="items-section">
+      <section class="items-section" aria-label="Shared items">
         <h2>Shared Items <span id="item-count" class="item-count"></span></h2>
         <div id="loading-state" class="loading-state">
           <div class="pikachu-loader"></div>
@@ -61,14 +76,26 @@
         </div>
         <div id="items-grid" class="items-grid"></div>
         <div id="empty-state" class="empty-state hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
           <p>Nothing shared yet</p>
           <p class="hint">Drop a file or paste some text to get started</p>
         </div>
       </section>
+      </main>
 
-      <div id="drag-overlay" class="drag-overlay hidden">
+      <footer class="site-footer">
+        <nav aria-label="Footer navigation">
+          <span class="footer-links">
+            <a href="https://github.com/hamshad/echochamber/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
+            <span class="footer-sep" aria-hidden="true">/</span>
+            <a href="https://github.com/hamshad/echochamber" target="_blank" rel="noopener noreferrer">Source</a>
+          </span>
+        </nav>
+      </footer>
+
+      <div id="drag-overlay" class="drag-overlay hidden" aria-hidden="true">
         <div class="drag-overlay-content">
-          <span class="drag-icon">📥</span>
+          <svg class="drag-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <p>Drop files to share</p>
         </div>
       </div>
@@ -80,9 +107,9 @@
             <h3 id="text-modal-title">View & Edit Text</h3>
             <div class="text-modal-actions">
               <button id="modal-copy-btn" class="btn btn-icon" title="Copy"><svg class="icon-lucide icon-copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-              <button id="modal-edit-btn" class="btn btn-icon" title="Edit">✏️</button>
+              <button id="modal-edit-btn" class="btn btn-icon" title="Edit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
               <button id="modal-save-btn" class="btn btn-primary" disabled>Save</button>
-              <button id="modal-close-btn" class="btn btn-icon" title="Close">✕</button>
+              <button id="modal-close-btn" class="btn btn-icon" title="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
           </header>
           <main class="text-modal-body">
