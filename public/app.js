@@ -22,6 +22,21 @@ function initTheme() {
 }
 initTheme();
 
+// GSAP entry animations
+function initEntryAnimations() {
+  const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+  tl.fromTo("#brand-title", { y: -20, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.8 })
+    .fromTo(".subtitle", { y: 15, opacity: 0, filter: "blur(4px)" }, { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.6 }, "-=0.5")
+    .fromTo(".status", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5 }, "-=0.35")
+    .fromTo(".github-link", { x: 20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5 }, "-=0.35")
+    .fromTo(".theme-toggle", { x: 20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5 }, "-=0.45")
+    .fromTo(".text-input-wrapper", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.3")
+    .fromTo(".file-upload-label", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.4")
+    .fromTo(".items-section h2", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 }, "-=0.3")
+    .fromTo(".site-footer", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5 }, "-=0.3");
+}
+initEntryAnimations();
+
 // Random quote
 function loadQuote() {
   const el = document.getElementById('daily-quote');

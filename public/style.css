@@ -811,11 +811,11 @@ body.show-all-active .item-card:nth-child(odd){animation-delay:0s,0.5s,0.4s}
   transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);
 }
 
-/* Header entrance */
-header h1{animation:bounceDown 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards}
-@keyframes bounceDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
-header .subtitle{animation:fadeSlideUp 0.5s 0.15s cubic-bezier(0.34,1.56,0.64,1) both}
-header .status{animation:fadeSlideUp 0.5s 0.25s cubic-bezier(0.34,1.56,0.64,1) both}
+/* GSAP entry animation initial states */
+#brand-title,.subtitle,.status,.github-link,.theme-toggle,
+.text-input-wrapper,.file-upload-label,.items-section h2,.site-footer{
+  opacity:0;
+}
 
 /* Input focus */
 textarea:focus{border-color:var(--text-secondary);box-shadow:0 0 0 3px rgba(17,17,17,0.04),0 0 16px rgba(17,17,17,0.03);transform:translateY(-1px)}
