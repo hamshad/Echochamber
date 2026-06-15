@@ -278,11 +278,10 @@ async function shareText(){
   if(!content) return;
   shareTextBtn.disabled = true;
   
-  // "Eating" animation: collapse the textarea
-  textInput.style.transition = 'all 0.4s cubic-bezier(0.64, 0, 0.78, 0)';
-  textInput.style.transform = 'scaleY(0.1) translateY(-20px)';
-  textInput.style.opacity = '0';
-  textInput.style.filter = 'blur(10px)';
+  gsap.to(textInput, {
+    scaleY: 0.1, y: -20, opacity: 0, filter: "blur(10px)",
+    duration: 0.4, ease: "power2.in"
+  });
   
   try{
     const res = await fetch('/api/text', {
@@ -291,28 +290,21 @@ async function shareText(){
       body:JSON.stringify({content})
     });
     if(res.ok) {
-        // Wait for animation to finish before clearing
-        setTimeout(() => {
-          textInput.value = '';
-          textInput.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-          textInput.style.transform = 'scaleY(1) translateY(0)';
-          textInput.style.opacity = '1';
-          textInput.style.filter = 'none';
-        }, 400);
+        gsap.to(textInput, {
+          scaleY: 1, y: 0, opacity: 1, filter: "blur(0px)",
+          duration: 0.4, ease: "back.out(1.7)",
+          delay: 0.1,
+          onStart: () => { textInput.value = ''; }
+        });
         
         const newItem = await res.json();
         if (!myIp) myIp = newItem.roomId;
     } else {
-      // Reset if failed
-      textInput.style.transform = 'none';
-      textInput.style.opacity = '1';
-      textInput.style.filter = 'none';
+      gsap.set(textInput, { scaleY: 1, y: 0, opacity: 1, filter: "none" });
     }
   }catch(err){
     console.error('Failed to share text:', err);
-    textInput.style.transform = 'none';
-    textInput.style.opacity = '1';
-    textInput.style.filter = 'none';
+    gsap.set(textInput, { scaleY: 1, y: 0, opacity: 1, filter: "none" });
   }finally{ shareTextBtn.disabled = false; }
 }
 
@@ -463,7 +455,11 @@ function syncDom(oldItems, newItems) {
     cols[shortest].appendChild(card);
     colHeights[shortest] += card.offsetHeight || 200;
     if (isNew) {
-      card.style.animation = 'bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+      gsap.fromTo(card,
+        { opacity: 0, y: 24, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.7)",
+          delay: 0.05 * Math.min(i, 5) }
+      );
     }
   });
 }
@@ -551,25 +547,68 @@ window.deleteItem = async function(id){
   const card = document.querySelector(`[data-id="${id}"]`);
   if (!card) return;
 
-  // 1. Mark as deleting - make it transparent and unclickable
   card.classList.add('deleting');
-  card.style.opacity = '0.5';
   card.style.pointerEvents = 'none';
-  card.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
     
-    // 2. Once API responds, do the "vanish" animation
-    // Note: The Firebase listener will soon call syncDom which will see 'deleting' class
-    // and wait for this animation to finish or let us handle it here.
-    card.style.transform = 'scale(0.1) rotate(-10deg) translateY(40px)';
-    card.style.opacity = '0';
-    card.style.filter = 'blur(10px)';
+    createDustEffect(card);
+  } catch (err) {
+    console.error('Delete failed:', err);
+    alert('Unable to delete item. Please try again.');
     
-    // We let the syncDom handle the actual removal, or we can clean up here
-    setTimeout(() => {
+    card.classList.remove('deleting');
+    card.style.pointerEvents = 'auto';
+    gsap.set(card, { opacity: 1, scale: 1, y: 0, filter: "none" });
+  }
+};
+
+function createDustEffect(card) {
+  const rect = card.getBoundingClientRect();
+  const particleCount = 40;
+  const container = document.createElement('div');
+  container.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden`;
+  document.body.appendChild(container);
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const baseColor = isDark ? [232, 232, 236] : [17, 17, 17];
+
+  for (let i = 0; i < particleCount; i++) {
+    const p = document.createElement('div');
+    const size = 2 + Math.random() * 4;
+    const startX = rect.left + Math.random() * rect.width;
+    const startY = rect.top + Math.random() * rect.height;
+    const opacity = 0.4 + Math.random() * 0.6;
+    const [r, g, b] = baseColor;
+    p.style.cssText = `
+      position:absolute;left:${startX}px;top:${startY}px;
+      width:${size}px;height:${size}px;border-radius:${Math.random() > 0.5 ? '50%' : '1px'};
+      background:rgba(${r},${g},${b},${opacity});
+      pointer-events:none;
+    `;
+    container.appendChild(p);
+
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 40 + Math.random() * 120;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance - 30 - Math.random() * 60;
+
+    gsap.to(p, {
+      x: dx, y: dy,
+      opacity: 0,
+      scale: 0.2 + Math.random() * 0.3,
+      rotation: Math.random() * 360,
+      duration: 0.6 + Math.random() * 0.5,
+      ease: "power2.out",
+    });
+  }
+
+  gsap.to(card, {
+    opacity: 0, scale: 0.9, filter: "blur(4px)",
+    duration: 0.3, ease: "power2.in",
+    onComplete: () => {
       if (card.parentNode) {
         if (document.startViewTransition) {
           document.startViewTransition(() => card.remove());
@@ -577,19 +616,10 @@ window.deleteItem = async function(id){
           card.remove();
         }
       }
-    }, 450);
-  } catch (err) {
-    console.error('Delete failed:', err);
-    alert('Unable to delete item. Please try again.');
-    
-    // Rollback
-    card.classList.remove('deleting');
-    card.style.opacity = '1';
-    card.style.pointerEvents = 'auto';
-    card.style.transform = 'none';
-    card.style.filter = 'none';
-  }
-};
+      setTimeout(() => container.remove(), 1200);
+    }
+  });
+}
 
 window.downloadFile = function(id){ window.open(`/api/download/${id}`,'_blank'); };
 

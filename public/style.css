@@ -234,12 +234,6 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
   border-radius:var(--radius);padding:1rem;position:relative;
   transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
-.item-card:nth-child(1){animation-delay:0ms}
-.item-card:nth-child(2){animation-delay:60ms}
-.item-card:nth-child(3){animation-delay:120ms}
-.item-card:nth-child(4){animation-delay:180ms}
-.item-card:nth-child(5){animation-delay:240ms}
-.item-card:nth-child(6){animation-delay:300ms}
 
 .item-card:hover{
   transform:translateY(-3px);
@@ -262,9 +256,14 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
   box-shadow:0 4px 24px rgba(52,101,56,0.1),0 0 0 1px rgba(52,101,56,0.06);
 }
 
-@keyframes cardIn{
-  from{opacity:0;transform:translateY(16px) scale(0.98)}
-  to{opacity:1;transform:translateY(0) scale(1)}
+@keyframes bounceIn{
+  0%{opacity:0;transform:translateY(24px) scale(0.92)}
+  60%{opacity:1;transform:translateY(-4px) scale(1.02)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes cardVanish{
+  0%{opacity:1;transform:scale(1);filter:blur(0)}
+  100%{opacity:0;transform:scale(0.85) translateY(20px);filter:blur(8px)}
 }
 
 .item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.625rem}
