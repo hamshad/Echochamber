@@ -812,6 +812,13 @@ body.show-all-active .item-card:nth-child(odd){animation-delay:0s,0.5s,0.4s}
 
 /* ========== CUSTOM CURSOR ========== */
 body{cursor:none}
+body a,body button,body label,body [role="button"],
+body input[type="file"],body textarea,.item-card,.keypad-key,
+body .btn,body .btn-icon,body .btn-download,body .theme-toggle,
+body .file-upload-label,body .github-link,body .extend-scroll{
+  cursor:none!important
+}
+body .btn-primary:disabled,body .extend-confirm:disabled{cursor:not-allowed!important}
 .cursor-ring,.cursor-dot{position:fixed;top:0;left:0;pointer-events:none;z-index:99999;will-change:transform}
 .cursor-ring{
   width:32px;height:32px;margin:-16px 0 0 -16px;
