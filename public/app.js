@@ -37,6 +37,82 @@ function initEntryAnimations() {
 }
 initEntryAnimations();
 
+// Custom cursor
+function initCursor() {
+  const ring = document.getElementById('cursor-ring');
+  const dot = document.getElementById('cursor-dot');
+  if (!ring || !dot) return;
+  if (window.matchMedia('(hover: none)').matches) return;
+
+  const xRing = gsap.quickTo(ring, 'left', { duration: 0.4, ease: 'power3.out' });
+  const yRing = gsap.quickTo(ring, 'top', { duration: 0.4, ease: 'power3.out' });
+  const xDot = gsap.quickTo(dot, 'left', { duration: 0.1, ease: 'power2.out' });
+  const yDot = gsap.quickTo(dot, 'top', { duration: 0.1, ease: 'power2.out' });
+
+  document.addEventListener('mousemove', (e) => {
+    xRing(e.clientX);
+    yRing(e.clientY);
+    xDot(e.clientX);
+    yDot(e.clientY);
+  });
+
+  const interactives = 'a, button, label, .item-card, .btn, .btn-icon, .btn-download, textarea, .keypad-key, .theme-toggle, .file-upload-label';
+
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest(interactives)) {
+      ring.classList.add('hovering');
+      dot.classList.add('hovering');
+      if (e.target.closest('.item-card')) ring.classList.add('card-hover');
+    }
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    if (e.target.closest(interactives)) {
+      ring.classList.remove('hovering');
+      dot.classList.remove('hovering');
+      ring.classList.remove('card-hover');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest(interactives)) {
+      gsap.fromTo(ring, { scale: 1.8, opacity: 0.8 }, { scale: 1, opacity: 0.4, duration: 0.4, ease: 'back.out(2)' });
+    }
+    createClickParticles(e.clientX, e.clientY);
+  });
+}
+
+function createClickParticles(x, y) {
+  const count = 4;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const isEasterEgg = document.body.classList.contains('show-all-active');
+  const color = isEasterEgg ? '196,148,10' : isDark ? '232,232,236' : '17,17,17';
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `
+      position:fixed;left:${x}px;top:${y}px;
+      width:3px;height:3px;border-radius:50%;
+      background:rgba(${color},0.6);
+      pointer-events:none;z-index:99998;
+    `;
+    document.body.appendChild(p);
+
+    const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.5;
+    const dist = 15 + Math.random() * 20;
+    gsap.to(p, {
+      x: Math.cos(angle) * dist,
+      y: Math.sin(angle) * dist,
+      opacity: 0,
+      scale: 0.3,
+      duration: 0.4,
+      ease: 'power2.out',
+      onComplete: () => p.remove()
+    });
+  }
+}
+initCursor();
+
 // Random quote
 function loadQuote() {
   const el = document.getElementById('daily-quote');
