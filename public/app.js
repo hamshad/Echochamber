@@ -1032,7 +1032,7 @@ window.openExtendDialog = function(itemId, btnEl) {
       dragging = true;
       startY = e.clientY;
       startScrollTop = scroll.scrollTop;
-      scroll.style.cursor = 'grabbing';
+      scroll.style.cursor = 'none';
       scroll.style.scrollSnapType = 'none';
       e.preventDefault();
     });
@@ -1049,7 +1049,7 @@ window.openExtendDialog = function(itemId, btnEl) {
     function mouseUpHandler() {
       if (!dragging) return;
       dragging = false;
-      scroll.style.cursor = '';
+      scroll.style.cursor = 'none';
       scroll.style.scrollSnapType = '';
       // Re-snap after drag ends
       snapToNearest(scroll);
