@@ -2,6 +2,10 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
 import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
 
+// Scroll lock for dialogs
+function lockBody(){ document.body.classList.add('dialog-open'); }
+function unlockBody(){ document.body.classList.remove('dialog-open'); }
+
 // Theme switching
 function initTheme() {
   const saved = localStorage.getItem('theme');
@@ -312,12 +316,13 @@ function showKeypad() {
   `;
 
   document.body.appendChild(overlay);
+  lockBody();
   const display = overlay.querySelector('#keypad-display');
 
   overlay.addEventListener('click', (e) => {
     const key = e.target.closest('.keypad-key');
     if (!key) {
-      if (e.target === overlay) overlay.remove();
+      if (e.target === overlay) { overlay.remove(); unlockBody(); }
       return;
     }
 
@@ -337,6 +342,7 @@ function showKeypad() {
       const code = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
       if (display.textContent === code) {
         overlay.remove();
+        unlockBody();
         toggleShowAll(true);
       } else {
         display.classList.add('keypad-shake');
@@ -442,10 +448,10 @@ async function uploadFiles(files){
 }
 
 let dragCounter = 0;
-document.addEventListener('dragenter',(e)=>{ e.preventDefault(); dragCounter++; dragOverlay.classList.remove('hidden'); });
-document.addEventListener('dragleave',(e)=>{ e.preventDefault(); dragCounter--; if(dragCounter===0) dragOverlay.classList.add('hidden'); });
+document.addEventListener('dragenter',(e)=>{ e.preventDefault(); dragCounter++; dragOverlay.classList.remove('hidden'); lockBody(); });
+document.addEventListener('dragleave',(e)=>{ e.preventDefault(); dragCounter--; if(dragCounter===0){ dragOverlay.classList.add('hidden'); unlockBody(); } });
 document.addEventListener('dragover',(e)=>{ e.preventDefault(); });
-document.addEventListener('drop',(e)=>{ e.preventDefault(); dragCounter=0; dragOverlay.classList.add('hidden'); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+document.addEventListener('drop',(e)=>{ e.preventDefault(); dragCounter=0; dragOverlay.classList.add('hidden'); unlockBody(); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
 
 function renderItems(newItems){
   const oldItems = [...items];
@@ -455,14 +461,7 @@ function renderItems(newItems){
   const hasItems = items.length > 0;
   emptyState.classList.toggle('hidden', hasItems);
   
-  // Use View Transitions API if available for smooth layout morphing
-  if (document.startViewTransition) {
-    document.startViewTransition(() => {
-      syncDom(oldItems, items);
-    });
-  } else {
-    syncDom(oldItems, items);
-  }
+  syncDom(oldItems, items);
 }
 
 function syncDom(oldItems, newItems) {
@@ -508,7 +507,6 @@ function syncDom(oldItems, newItems) {
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml.trim();
       const newCard = temp.firstChild;
-      newCard.style.viewTransitionName = `card-${item.id}`;
       return newCard;
     }
   });
@@ -567,7 +565,7 @@ function renderTextCard(item){
   }
   
   return `
-    <div class="item-card text${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+    <div class="item-card text${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}">
       <div class="item-header">
         <span class="item-type text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Text</span>
         <div class="item-actions">
@@ -593,7 +591,7 @@ function renderFileCard(item){
   const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
   return `
-    <div class="item-card file${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}" style="view-transition-name: card-${item.id}">
+    <div class="item-card file${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}">
       <div class="item-header">
         <span class="item-type file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> File</span>
         <div class="item-actions">
@@ -686,11 +684,7 @@ function createDustEffect(card) {
     duration: 0.3, ease: "power2.in",
     onComplete: () => {
       if (card.parentNode) {
-        if (document.startViewTransition) {
-          document.startViewTransition(() => card.remove());
-        } else {
-          card.remove();
-        }
+        card.remove();
       }
       setTimeout(() => container.remove(), 1200);
     }
@@ -786,7 +780,6 @@ window.openTextModal = function(id){
   const item = items.find(i => i.id === id);
   if(!item) return;
   modalEditingId = id;
-  // Ensure the textarea exists but hide it; we'll show preview by default
   modalTextarea = document.getElementById('modal-textarea');
   if (modalTextarea) {
     try { modalTextarea.style.display = 'none'; } catch (e) { /* ignore if removed */ }
@@ -800,6 +793,7 @@ window.openTextModal = function(id){
   body.appendChild(preview);
   textModal.classList.remove('hidden');
   modalSaveBtn.disabled = true;
+  lockBody();
 }
 
 window.openYouTubePopup = function(videoId){
@@ -841,6 +835,7 @@ window.openYouTubePopup = function(videoId){
   }
   
   popup.style.display = 'flex';
+  lockBody();
 }
 
 window.closeYouTubePopup = function(){
@@ -852,18 +847,33 @@ window.closeYouTubePopup = function(){
     if (iframe) {
       iframe.src = '';
     }
+    unlockBody();
   }
 }
 
 function closeTextModal(){
-  // Reset modal content to default textarea placeholder so next open is consistent
   const body = document.querySelector('.text-modal-body');
-  if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
-  // reset buttons and state
+  const panel = document.querySelector('.text-modal-panel');
   if (modalCopyBtn) modalCopyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   if (modalSaveBtn) modalSaveBtn.disabled = true;
-  textModal.classList.add('hidden');
-  modalEditingId = null;
+  if (panel) {
+    gsap.to(panel, {
+      opacity: 0, y: 12, scale: 0.99,
+      duration: 0.2, ease: 'power2.in',
+      onComplete: () => {
+        if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
+        textModal.classList.add('hidden');
+        gsap.set(panel, { clearProps: 'all' });
+        modalEditingId = null;
+        unlockBody();
+      }
+    });
+  } else {
+    if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
+    textModal.classList.add('hidden');
+    modalEditingId = null;
+    unlockBody();
+  }
 }
 
 modalCloseBtn.addEventListener('click', closeTextModal);
@@ -881,11 +891,21 @@ async function saveModalText(){
   if(!modalEditingId) return;
   const ta = document.getElementById('modal-textarea');
   const updated = ta ? ta.value : '';
+
+  // Close modal instantly before API calls so Firebase re-renders happen after modal is gone
+  const body = document.querySelector('.text-modal-body');
+  if (body) body.innerHTML = '<textarea id="modal-textarea" rows="12"></textarea>';
+  if (modalCopyBtn) modalCopyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  if (modalSaveBtn) modalSaveBtn.disabled = true;
+  const savedId = modalEditingId;
+  modalEditingId = null;
+  textModal.classList.add('hidden');
+  unlockBody();
+
   try{
     const res = await fetch('/api/text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: updated }) });
     if(res.ok){
-      await fetch(`/api/items/${modalEditingId}`, { method: 'DELETE' }).catch(()=>{});
-      closeTextModal();
+      await fetch(`/api/items/${savedId}`, { method: 'DELETE' }).catch(()=>{});
     }
   }catch(e){ console.error('Save text failed', e); }
 }
@@ -909,8 +929,16 @@ modalEditBtn.addEventListener('click', ()=>{ enterEditMode(); });
 
 // Keyboard shortcuts: Esc to close, Ctrl/Cmd+S to save, Ctrl/Cmd+C to copy
 document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') {
+    const popup = document.getElementById('youtube-popup');
+    if (popup && popup.style.display !== 'none') { closeYouTubePopup(); return; }
+    const keypad = document.getElementById('keypad-overlay');
+    if (keypad) { keypad.remove(); unlockBody(); return; }
+    if (extendDialogEl) { closeExtendDialog(); return; }
+    if (!textModal.classList.contains('hidden')) { closeTextModal(); }
+    return;
+  }
   if (textModal.classList.contains('hidden')) return;
-  if (e.key === 'Escape') { closeTextModal(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
     saveModalText();
@@ -1010,6 +1038,7 @@ window.openExtendDialog = function(itemId, btnEl) {
 
   document.body.appendChild(dialog);
   extendDialogEl = dialog;
+  lockBody();
 
   // Setup scroll snapping and mouse drag
   const scrolls = dialog.querySelectorAll('.extend-scroll');
@@ -1149,6 +1178,7 @@ function closeExtendDialog() {
     extendDialogEl.remove();
     extendDialogEl = null;
     extendItemId = null;
+    unlockBody();
   }
 }
 

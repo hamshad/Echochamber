@@ -57,6 +57,7 @@ body{
   color:var(--text);min-height:100vh;line-height:1.6;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 }
+body.dialog-open{overflow:hidden;height:100vh}
 
 /* Skip to content */
 .skip-link{
@@ -225,6 +226,10 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
 }
 .items-grid>.item-card{
   display:block;width:100%;
+}
+body.dialog-open .item-card{
+  z-index:0!important;pointer-events:none;
+  transform:none!important;box-shadow:none!important;
 }
 
 /* ========== ITEM CARDS ========== */
@@ -951,10 +956,11 @@ textarea:not(:focus){box-shadow:none}
 }
 
 /* Modal backdrop entrance */
-.text-modal-backdrop{animation:fadeIn 0.2s ease-out}
+.text-modal-backdrop{animation:fadeIn 0.15s ease-out}
 .text-modal-panel{
   animation:modalIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards;
 }
+body.dialog-open #app{z-index:0}
 
 /* ========== PARTICLES (easter egg) ========== */
 #particles-bg{
