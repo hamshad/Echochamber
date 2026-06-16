@@ -959,12 +959,21 @@ function extractUrls(text) {
 }
 
 function extractYouTubeUrls(text) {
-  const youtubePattern = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([^&\s]+)|https?:\/\/youtu\.be\/([^&\s?]+)/g;
-  const matches = [...text.matchAll(youtubePattern)];
-  return matches.map(match => ({
-    fullUrl: match[0],
-    videoId: match[1] || match[2]
-  }));
+  const results = [];
+  // Match any youtube.com or youtu.be URL
+  const urlPattern = /https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/[^\s]+|youtu\.be\/[^\s?#]+)/g;
+  for (const match of text.matchAll(urlPattern)) {
+    const url = match[0];
+    let videoId = null;
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1]?.split(/[?&#\s]/)[0];
+    } else {
+      const vMatch = url.match(/[?&]v=([^&\s#]+)/);
+      if (vMatch) videoId = vMatch[1];
+    }
+    if (videoId) results.push({ fullUrl: url, videoId });
+  }
+  return results;
 }
 
 function renderTextWithLinks(text) {
@@ -1038,7 +1047,6 @@ window.openExtendDialog = function(itemId, btnEl) {
 
   document.body.appendChild(dialog);
   extendDialogEl = dialog;
-  lockBody();
 
   // Setup scroll snapping and mouse drag
   const scrolls = dialog.querySelectorAll('.extend-scroll');
@@ -1178,7 +1186,6 @@ function closeExtendDialog() {
     extendDialogEl.remove();
     extendDialogEl = null;
     extendItemId = null;
-    unlockBody();
   }
 }
 
