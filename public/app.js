@@ -538,12 +538,12 @@ function syncDom(oldItems, newItems) {
     colHeights[shortest] += card.offsetHeight || 200;
 
     if (isInitialLoad) {
-      // First load: stagger fade-in upward
-      gsap.fromTo(card,
-        { opacity: 0, y: 24 },
-        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
-          delay: 0.04 * i }
-      );
+      // Start invisible so there's no flash before stagger
+      gsap.set(card, { opacity: 0, y: 24 });
+      gsap.to(card, {
+        opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
+        delay: 0.04 * i
+      });
     } else if (isNew) {
       // New card: fade in
       gsap.fromTo(card,
