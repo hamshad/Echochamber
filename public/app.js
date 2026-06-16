@@ -453,8 +453,6 @@ document.addEventListener('dragleave',(e)=>{ e.preventDefault(); dragCounter--; 
 document.addEventListener('dragover',(e)=>{ e.preventDefault(); });
 document.addEventListener('drop',(e)=>{ e.preventDefault(); dragCounter=0; dragOverlay.classList.add('hidden'); unlockBody(); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
 
-let firstRender = true;
-
 function renderItems(newItems){
   const oldItems = [...items];
   if(newItems !== undefined) items = newItems;
@@ -475,6 +473,7 @@ function syncDom(oldItems, newItems) {
   });
 
   const newIds = new Set(newItems.map(i => i.id));
+  const isInitialLoad = oldItems.length === 0 && allCards.length === 0;
   const COLS = window.innerWidth <= 640 ? 1 : 2;
   const cols = Array.from(itemsGrid.querySelectorAll('.masonry-col'));
 
@@ -538,8 +537,8 @@ function syncDom(oldItems, newItems) {
     cols[shortest].appendChild(card);
     colHeights[shortest] += card.offsetHeight || 200;
 
-    if (firstRender) {
-      // First render: stagger fade-in upward
+    if (isInitialLoad) {
+      // First load: stagger fade-in upward
       gsap.fromTo(card,
         { opacity: 0, y: 24 },
         { opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
@@ -566,7 +565,6 @@ function syncDom(oldItems, newItems) {
     }
   });
 
-  if (firstRender) firstRender = false;
 }
 
 function renderTextCard(item){
