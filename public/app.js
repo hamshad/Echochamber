@@ -461,10 +461,24 @@ function renderItems(newItems){
   const hasItems = items.length > 0;
   emptyState.classList.toggle('hidden', hasItems);
   
-  syncDom(oldItems, items);
+  const isInitialLoad = oldItems.length === 0 && itemsGrid.querySelectorAll('.item-card').length === 0;
+  if (isInitialLoad) itemsGrid.style.visibility = 'hidden';
+  
+  syncDom(oldItems, items, isInitialLoad);
+
+  if (isInitialLoad) {
+    itemsGrid.style.visibility = '';
+    const cards = itemsGrid.querySelectorAll('.item-card');
+    cards.forEach((card, i) => {
+      gsap.to(card, {
+        opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
+        delay: 0.04 * i
+      });
+    });
+  }
 }
 
-function syncDom(oldItems, newItems) {
+function syncDom(oldItems, newItems, isInitialLoad) {
   const oldMap = {};
   const allCards = itemsGrid.querySelectorAll('.item-card');
   allCards.forEach(c => {
@@ -473,7 +487,6 @@ function syncDom(oldItems, newItems) {
   });
 
   const newIds = new Set(newItems.map(i => i.id));
-  const isInitialLoad = oldItems.length === 0 && allCards.length === 0;
   const COLS = window.innerWidth <= 640 ? 1 : 2;
   const cols = Array.from(itemsGrid.querySelectorAll('.masonry-col'));
 
@@ -538,12 +551,8 @@ function syncDom(oldItems, newItems) {
     colHeights[shortest] += card.offsetHeight || 200;
 
     if (isInitialLoad) {
-      // Start invisible so there's no flash before stagger
+      // Cards will be animated in renderItems after grid becomes visible
       gsap.set(card, { opacity: 0, y: 24 });
-      gsap.to(card, {
-        opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
-        delay: 0.04 * i
-      });
     } else if (isNew) {
       // New card: fade in
       gsap.fromTo(card,
