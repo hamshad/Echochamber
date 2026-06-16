@@ -463,15 +463,7 @@ function renderItems(newItems){
   const hasItems = items.length > 0;
   emptyState.classList.toggle('hidden', hasItems);
   
-  // Skip View Transitions on first render to avoid full-page flash
-  if (!firstRender && document.startViewTransition) {
-    document.startViewTransition(() => {
-      syncDom(oldItems, items);
-    });
-  } else {
-    syncDom(oldItems, items);
-    firstRender = false;
-  }
+  syncDom(oldItems, items);
 }
 
 function syncDom(oldItems, newItems) {
@@ -486,7 +478,16 @@ function syncDom(oldItems, newItems) {
   const COLS = window.innerWidth <= 640 ? 1 : 2;
   const cols = Array.from(itemsGrid.querySelectorAll('.masonry-col'));
 
-  // Remove deleted cards
+  // FLIP: record old positions of existing cards (skip ones being dusted)
+  const oldPositions = {};
+  allCards.forEach(c => {
+    const id = c.getAttribute('data-id');
+    if (id && oldMap[id] && !c.classList.contains('deleting')) {
+      oldPositions[id] = c.getBoundingClientRect();
+    }
+  });
+
+  // Remove deleted cards (skip .deleting ones — dust effect handles them)
   allCards.forEach(c => {
     const id = c.getAttribute('data-id');
     if (!newIds.has(id) && !c.classList.contains('deleting')) {
@@ -498,7 +499,6 @@ function syncDom(oldItems, newItems) {
   const cardElements = newItems.map(item => {
     const existing = oldMap[item.id];
     if (existing) {
-      // Update existing card footer
       const isImmortal = item.expiresAt >= 9000000000000000;
       const timeLeft = getTimeLeft(item.expiresAt);
       const expiresSoon = !isImmortal && (item.expiresAt - Date.now()) < 10 * 60 * 1000;
@@ -516,12 +516,11 @@ function syncDom(oldItems, newItems) {
       const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml.trim();
-      const newCard = temp.firstChild;
-      return newCard;
+      return temp.firstChild;
     }
   });
 
-  // Clear all cards from columns (detach, don't destroy)
+  // Clear all cards from columns
   cols.forEach(col => {
     while (col.firstChild) col.removeChild(col.firstChild);
   });
@@ -538,14 +537,36 @@ function syncDom(oldItems, newItems) {
     }
     cols[shortest].appendChild(card);
     colHeights[shortest] += card.offsetHeight || 200;
-    if (isNew) {
+
+    if (firstRender) {
+      // First render: stagger fade-in upward
       gsap.fromTo(card,
-        { opacity: 0, y: 24, scale: 0.92 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.7)",
-          delay: 0.05 * Math.min(i, 5) }
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
+          delay: 0.04 * i }
       );
+    } else if (isNew) {
+      // New card: fade in
+      gsap.fromTo(card,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.out" }
+      );
+    } else if (oldPositions[item.id]) {
+      // Existing card: FLIP to new position
+      const oldRect = oldPositions[item.id];
+      const newRect = card.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        gsap.fromTo(card,
+          { x: dx, y: dy },
+          { x: 0, y: 0, duration: 0.35, ease: "power2.out" }
+        );
+      }
     }
   });
+
+  if (firstRender) firstRender = false;
 }
 
 function renderTextCard(item){
@@ -631,18 +652,18 @@ window.deleteItem = async function(id){
   const card = document.querySelector(`[data-id="${id}"]`);
   if (!card) return;
 
+  // Save rect and start dust immediately
+  const rect = card.getBoundingClientRect();
   card.classList.add('deleting');
   card.style.pointerEvents = 'none';
+  createDustEffect(card, rect);
 
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
-    
-    createDustEffect(card);
   } catch (err) {
     console.error('Delete failed:', err);
     alert('Unable to delete item. Please try again.');
-    
     card.classList.remove('deleting');
     card.style.pointerEvents = 'auto';
     gsap.set(card, { opacity: 1, scale: 1, y: 0, filter: "none" });
