@@ -219,11 +219,11 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
 .item-count{font-weight:400;color:var(--text-tertiary);font-size:0.7rem}
 
 .items-grid{
-  display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;gap:0.75rem;
-  align-items:start;
+  column-count:2;column-gap:0.75rem;
 }
 .items-grid>.item-card{
-  display:block;width:100%;
+  display:inline-block;width:100%;margin-bottom:0.75rem;
+  break-inside:avoid;
 }
 body.dialog-open .item-card{
   z-index:0!important;pointer-events:none;
@@ -923,7 +923,7 @@ textarea:not(:focus){box-shadow:none}
 /* ========== RESPONSIVE ========== */
 @media(max-width:640px){
   #app{padding:2rem 1.25rem 3rem}
-  .items-grid{grid-template-columns:1fr}
+  .items-grid{column-count:1}
   h1{font-size:2.25rem}
   .subtitle{font-size:0.9rem}
   header{margin-bottom:2.5rem}
