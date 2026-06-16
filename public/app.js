@@ -511,15 +511,6 @@ function syncDom(oldItems, newItems) {
     }
   });
 
-  // FLIP: Record old positions of existing cards before clearing
-  const oldPositions = {};
-  allCards.forEach(c => {
-    const id = c.getAttribute('data-id');
-    if (id && oldMap[id]) {
-      oldPositions[id] = c.getBoundingClientRect();
-    }
-  });
-
   // Clear all cards from columns (detach, don't destroy)
   cols.forEach(col => {
     while (col.firstChild) col.removeChild(col.firstChild);
@@ -537,26 +528,12 @@ function syncDom(oldItems, newItems) {
     }
     cols[shortest].appendChild(card);
     colHeights[shortest] += card.offsetHeight || 200;
-
     if (isNew) {
-      // New cards: bounce in
       gsap.fromTo(card,
         { opacity: 0, y: 24, scale: 0.92 },
         { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.7)",
           delay: 0.05 * Math.min(i, 5) }
       );
-    } else if (oldPositions[item.id]) {
-      // Existing cards: FLIP animate from old position to new
-      const oldRect = oldPositions[item.id];
-      const newRect = card.getBoundingClientRect();
-      const dx = oldRect.left - newRect.left;
-      const dy = oldRect.top - newRect.top;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        gsap.fromTo(card,
-          { x: dx, y: dy },
-          { x: 0, y: 0, duration: 0.4, ease: "power2.out" }
-        );
-      }
     }
   });
 }
