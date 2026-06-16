@@ -248,10 +248,10 @@ fetch('/api/cleanup').catch(() => {});
 
 function filterAndRender() {
   const now = Date.now();
-  items = cachedAllItems
+  const filtered = cachedAllItems
     .filter(i => i.expiresAt > now && (showAll || i.roomId === myIp))
     .sort((a, b) => b.createdAt - a.createdAt);
-  renderItems();
+  renderItems(filtered);
 }
 
 shareTextBtn.addEventListener('click', shareText);
@@ -462,19 +462,12 @@ function renderItems(newItems){
   emptyState.classList.toggle('hidden', hasItems);
   
   const isInitialLoad = oldItems.length === 0 && itemsGrid.querySelectorAll('.item-card').length === 0;
-  if (isInitialLoad) itemsGrid.style.visibility = 'hidden';
+  if (isInitialLoad) itemsGrid.classList.add('initial-load');
   
   syncDom(oldItems, items, isInitialLoad);
 
-  if (isInitialLoad) {
-    itemsGrid.style.visibility = '';
-    const cards = itemsGrid.querySelectorAll('.item-card');
-    cards.forEach((card, i) => {
-      gsap.to(card, {
-        opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
-        delay: 0.04 * i
-      });
-    });
+  if (isInitialLoad && itemsGrid.querySelectorAll('.item-card').length === 0) {
+    itemsGrid.classList.remove('initial-load');
   }
 }
 
@@ -487,19 +480,41 @@ function syncDom(oldItems, newItems, isInitialLoad) {
   });
 
   const newIds = new Set(newItems.map(i => i.id));
-  const COLS = window.innerWidth <= 640 ? 1 : 2;
-  const cols = Array.from(itemsGrid.querySelectorAll('.masonry-col'));
 
-  // FLIP: record old positions of existing cards (skip ones being dusted)
-  const oldPositions = {};
+  const isInitial = isInitialLoad;
+  if (isInitial) {
+    const cardElements = newItems.map(item => {
+      const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
+      const temp = document.createElement('div');
+      temp.innerHTML = cardHtml.trim();
+      return temp.firstChild;
+    });
+    cardElements.forEach((card, i) => {
+      itemsGrid.appendChild(card);
+    });
+    cardElements.forEach((card, i) => {
+      gsap.fromTo(card,
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out",
+          delay: 0.04 * i,
+          onStart: () => {
+            if (i === cardElements.length - 1) {
+              setTimeout(() => itemsGrid.classList.remove('initial-load'), 1000);
+            }
+          }
+        }
+      );
+    });
+    return;
+  }
+
+  // FLIP on delete: record all positions before removal
+  const preDeleteRects = {};
   allCards.forEach(c => {
     const id = c.getAttribute('data-id');
-    if (id && oldMap[id] && !c.classList.contains('deleting')) {
-      oldPositions[id] = c.getBoundingClientRect();
-    }
+    if (id) preDeleteRects[id] = c.getBoundingClientRect();
   });
 
-  // Remove deleted cards (skip .deleting ones — dust effect handles them)
   allCards.forEach(c => {
     const id = c.getAttribute('data-id');
     if (!newIds.has(id) && !c.classList.contains('deleting')) {
@@ -507,8 +522,24 @@ function syncDom(oldItems, newItems, isInitialLoad) {
     }
   });
 
-  // Build cards array: re-use existing, create new
-  const cardElements = newItems.map(item => {
+  const remainingCards = itemsGrid.querySelectorAll('.item-card:not(.deleting)');
+  remainingCards.forEach(c => { c.style.transition = 'none'; });
+  remainingCards.forEach(c => {
+    const id = c.getAttribute('data-id');
+    if (id && preDeleteRects[id]) {
+      const oldRect = preDeleteRects[id];
+      const newRect = c.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        gsap.fromTo(c, { x: dx, y: dy }, { x: 0, y: 0, duration: 0.45, ease: "power3.out" });
+      }
+    }
+  });
+  gsap.delayedCall(0.6, () => { remainingCards.forEach(c => { c.style.transition = ''; }); });
+
+  // Update existing / add new cards
+  newItems.forEach(item => {
     const existing = oldMap[item.id];
     if (existing) {
       const isImmortal = item.expiresAt >= 9000000000000000;
@@ -523,54 +554,43 @@ function syncDom(oldItems, newItems, isInitialLoad) {
       }
       if (isImmortal) existing.classList.add('immortal');
       else existing.classList.remove('immortal');
-      return existing;
     } else {
+      // New card: record positions, prepend, FLIP shifted cards
       const cardHtml = item.type === 'text' ? renderTextCard(item) : renderFileCard(item);
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml.trim();
-      return temp.firstChild;
-    }
-  });
+      const card = temp.firstChild;
 
-  // Clear all cards from columns
-  cols.forEach(col => {
-    while (col.firstChild) col.removeChild(col.firstChild);
-  });
+      const existCards = itemsGrid.querySelectorAll('.item-card:not(.deleting)');
+      const addRects = [];
+      existCards.forEach(c => {
+        addRects.push({ el: c, left: c.getBoundingClientRect().left, top: c.getBoundingClientRect().top });
+      });
 
-  // Redistribute all cards into columns by shortest height
-  const colHeights = [0, 0];
-  cardElements.forEach((card, i) => {
-    const item = newItems[i];
-    if (!item) return;
-    const isNew = !oldMap[item.id];
-    let shortest = 0;
-    for (let c = 1; c < COLS; c++) {
-      if (colHeights[c] < colHeights[shortest]) shortest = c;
-    }
-    cols[shortest].appendChild(card);
-    colHeights[shortest] += card.offsetHeight || 200;
+      if (itemsGrid.firstChild) {
+        itemsGrid.insertBefore(card, itemsGrid.firstChild);
+      } else {
+        itemsGrid.appendChild(card);
+      }
 
-    if (isInitialLoad) {
-      // Cards will be animated in renderItems after grid becomes visible
-      gsap.set(card, { opacity: 0, y: 24 });
-    } else if (isNew) {
-      // New card: fade in
+      addRects.forEach(({ el: c }) => { c.style.transition = 'none'; });
+      addRects.forEach(({ el: c, left: oldLeft, top: oldTop }) => {
+        const newRect = c.getBoundingClientRect();
+        const dx = oldLeft - newRect.left;
+        const dy = oldTop - newRect.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          gsap.fromTo(c, { x: dx, y: dy }, { x: 0, y: 0, duration: 0.45, ease: "power3.out" });
+        }
+      });
+      gsap.delayedCall(0.6, () => { addRects.forEach(({ el: c }) => { c.style.transition = ''; }); });
+
+      card.style.transition = 'none';
       gsap.fromTo(card,
         { opacity: 0 },
-        { opacity: 1, duration: 0.4, ease: "power2.out" }
+        { opacity: 1, duration: 0.4, ease: "power2.out",
+          onComplete: () => { card.style.transition = ''; }
+        }
       );
-    } else if (oldPositions[item.id]) {
-      // Existing card: FLIP to new position
-      const oldRect = oldPositions[item.id];
-      const newRect = card.getBoundingClientRect();
-      const dx = oldRect.left - newRect.left;
-      const dy = oldRect.top - newRect.top;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        gsap.fromTo(card,
-          { x: dx, y: dy },
-          { x: 0, y: 0, duration: 0.35, ease: "power2.out" }
-        );
-      }
     }
   });
 
@@ -719,9 +739,35 @@ function createDustEffect(card, savedRect) {
 
   gsap.to(card, {
     opacity: 0, scale: 0.9, filter: "blur(4px)",
-    duration: 0.3, ease: "power2.in",
+    duration: 0.8, ease: "power2.in",
     onComplete: () => {
-      if (card.parentNode) card.remove();
+      // FLIP: animate remaining cards that shift after removal
+      const col = card.parentNode;
+      if (col) {
+        const allCards = [...col.querySelectorAll('.item-card')];
+        const below = [];
+        let passed = false;
+        allCards.forEach(c => {
+          if (c === card) { passed = true; return; }
+          if (passed) {
+            const r = c.getBoundingClientRect();
+            below.push({ el: c, left: r.left, top: r.top });
+          }
+        });
+        card.remove();
+        below.forEach(({ el: c }) => { c.style.transition = 'none'; });
+        below.forEach(({ el: c, left: oldLeft, top: oldTop }) => {
+          const r = c.getBoundingClientRect();
+          const dx = oldLeft - r.left;
+          const dy = oldTop - r.top;
+          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            gsap.fromTo(c, { x: dx, y: dy }, { x: 0, y: 0, duration: 0.45, ease: "power3.out" });
+          }
+        });
+        gsap.delayedCall(0.6, () => { below.forEach(({ el: c }) => { c.style.transition = ''; }); });
+      } else {
+        if (card.parentNode) card.remove();
+      }
       setTimeout(() => container.remove(), 1200);
     }
   });

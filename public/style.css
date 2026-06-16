@@ -219,10 +219,7 @@ textarea:focus{border-color:var(--text-secondary);outline:none}
 .item-count{font-weight:400;color:var(--text-tertiary);font-size:0.7rem}
 
 .items-grid{
-  display:flex;gap:0.75rem;
-}
-.items-grid>.masonry-col{
-  flex:1;display:flex;flex-direction:column;gap:0.75rem;
+  display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;gap:0.75rem;
 }
 .items-grid>.item-card{
   display:block;width:100%;
@@ -237,7 +234,12 @@ body.dialog-open .item-card{
   display:block;width:100%;background:var(--surface);
   border:1px solid var(--border);border-left:5px solid var(--border-strong);
   border-radius:var(--radius);padding:1rem;position:relative;
-  transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
+}
+.items-grid.initial-load .item-card{
+  transition:none!important;opacity:0;transform:translateY(24px);
 }
 
 .item-card:hover{
@@ -920,8 +922,7 @@ textarea:not(:focus){box-shadow:none}
 /* ========== RESPONSIVE ========== */
 @media(max-width:640px){
   #app{padding:2rem 1.25rem 3rem}
-  .items-grid{flex-direction:column}
-  .items-grid>.masonry-col{flex:none;width:100%}
+  .items-grid{grid-template-columns:1fr}
   h1{font-size:2.25rem}
   .subtitle{font-size:0.9rem}
   header{margin-bottom:2.5rem}
