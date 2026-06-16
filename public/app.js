@@ -479,7 +479,7 @@ function syncDom(oldItems, newItems) {
   // Remove deleted cards
   allCards.forEach(c => {
     const id = c.getAttribute('data-id');
-    if (!newIds.has(id) && !c.classList.contains('deleting')) {
+    if (!newIds.has(id)) {
       c.remove();
     }
   });
@@ -511,6 +511,15 @@ function syncDom(oldItems, newItems) {
     }
   });
 
+  // FLIP: Record old positions of existing cards before clearing
+  const oldPositions = {};
+  allCards.forEach(c => {
+    const id = c.getAttribute('data-id');
+    if (id && oldMap[id]) {
+      oldPositions[id] = c.getBoundingClientRect();
+    }
+  });
+
   // Clear all cards from columns (detach, don't destroy)
   cols.forEach(col => {
     while (col.firstChild) col.removeChild(col.firstChild);
@@ -528,12 +537,26 @@ function syncDom(oldItems, newItems) {
     }
     cols[shortest].appendChild(card);
     colHeights[shortest] += card.offsetHeight || 200;
+
     if (isNew) {
+      // New cards: bounce in
       gsap.fromTo(card,
         { opacity: 0, y: 24, scale: 0.92 },
         { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.7)",
           delay: 0.05 * Math.min(i, 5) }
       );
+    } else if (oldPositions[item.id]) {
+      // Existing cards: FLIP animate from old position to new
+      const oldRect = oldPositions[item.id];
+      const newRect = card.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left;
+      const dy = oldRect.top - newRect.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        gsap.fromTo(card,
+          { x: dx, y: dy },
+          { x: 0, y: 0, duration: 0.4, ease: "power2.out" }
+        );
+      }
     }
   });
 }
@@ -621,26 +644,24 @@ window.deleteItem = async function(id){
   const card = document.querySelector(`[data-id="${id}"]`);
   if (!card) return;
 
-  card.classList.add('deleting');
+  // Capture rect and create dust effect immediately before Firebase yanks the card
+  const rect = card.getBoundingClientRect();
   card.style.pointerEvents = 'none';
+  createDustEffect(card, rect);
 
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
-    
-    createDustEffect(card);
   } catch (err) {
     console.error('Delete failed:', err);
     alert('Unable to delete item. Please try again.');
-    
-    card.classList.remove('deleting');
     card.style.pointerEvents = 'auto';
     gsap.set(card, { opacity: 1, scale: 1, y: 0, filter: "none" });
   }
 };
 
-function createDustEffect(card) {
-  const rect = card.getBoundingClientRect();
+function createDustEffect(card, savedRect) {
+  const rect = savedRect || card.getBoundingClientRect();
   const particleCount = 40;
   const container = document.createElement('div');
   container.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden`;
@@ -679,13 +700,11 @@ function createDustEffect(card) {
     });
   }
 
+  // Fade out and shrink the card itself
   gsap.to(card, {
     opacity: 0, scale: 0.9, filter: "blur(4px)",
     duration: 0.3, ease: "power2.in",
     onComplete: () => {
-      if (card.parentNode) {
-        card.remove();
-      }
       setTimeout(() => container.remove(), 1200);
     }
   });
