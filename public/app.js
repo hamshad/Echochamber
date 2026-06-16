@@ -453,6 +453,8 @@ document.addEventListener('dragleave',(e)=>{ e.preventDefault(); dragCounter--; 
 document.addEventListener('dragover',(e)=>{ e.preventDefault(); });
 document.addEventListener('drop',(e)=>{ e.preventDefault(); dragCounter=0; dragOverlay.classList.add('hidden'); unlockBody(); if(e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
 
+let firstRender = true;
+
 function renderItems(newItems){
   const oldItems = [...items];
   if(newItems !== undefined) items = newItems;
@@ -461,7 +463,15 @@ function renderItems(newItems){
   const hasItems = items.length > 0;
   emptyState.classList.toggle('hidden', hasItems);
   
-  syncDom(oldItems, items);
+  // Skip View Transitions on first render to avoid full-page flash
+  if (!firstRender && document.startViewTransition) {
+    document.startViewTransition(() => {
+      syncDom(oldItems, items);
+    });
+  } else {
+    syncDom(oldItems, items);
+    firstRender = false;
+  }
 }
 
 function syncDom(oldItems, newItems) {
@@ -479,7 +489,7 @@ function syncDom(oldItems, newItems) {
   // Remove deleted cards
   allCards.forEach(c => {
     const id = c.getAttribute('data-id');
-    if (!newIds.has(id)) {
+    if (!newIds.has(id) && !c.classList.contains('deleting')) {
       c.remove();
     }
   });
@@ -621,17 +631,19 @@ window.deleteItem = async function(id){
   const card = document.querySelector(`[data-id="${id}"]`);
   if (!card) return;
 
-  // Capture rect and create dust effect immediately before Firebase yanks the card
-  const rect = card.getBoundingClientRect();
+  card.classList.add('deleting');
   card.style.pointerEvents = 'none';
-  createDustEffect(card, rect);
 
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
+    
+    createDustEffect(card);
   } catch (err) {
     console.error('Delete failed:', err);
     alert('Unable to delete item. Please try again.');
+    
+    card.classList.remove('deleting');
     card.style.pointerEvents = 'auto';
     gsap.set(card, { opacity: 1, scale: 1, y: 0, filter: "none" });
   }
@@ -677,11 +689,11 @@ function createDustEffect(card, savedRect) {
     });
   }
 
-  // Fade out and shrink the card itself
   gsap.to(card, {
     opacity: 0, scale: 0.9, filter: "blur(4px)",
     duration: 0.3, ease: "power2.in",
     onComplete: () => {
+      if (card.parentNode) card.remove();
       setTimeout(() => container.remove(), 1200);
     }
   });
