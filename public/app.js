@@ -259,6 +259,14 @@ textInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) shareText();
 });
 
+textInput.addEventListener('paste', (e) => {
+  const files = e.clipboardData.files;
+  if (files.length) {
+    e.preventDefault();
+    uploadFiles(files);
+  }
+});
+
 fileInput.addEventListener('change', () => {
   if (fileInput.files.length) uploadFiles(fileInput.files);
   fileInput.value = '';
