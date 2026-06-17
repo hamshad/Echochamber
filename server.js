@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { getDatabase } from 'firebase-admin/database';
+import 'dotenv/config';
 
 const PORT = process.env.PORT || 3000;
 const TTL = parseInt(process.env.TTL_MS, 10) || 60 * 60 * 1000; // 1 hour (configurable for tests)
@@ -159,6 +160,26 @@ app.get('/api/cleanup', async (req, res) => {
 // GET /api/whoami
 app.get('/api/whoami', (req, res) => {
   res.json({ ip: getRoomId(req) });
+});
+
+// GET /api/calvin — random Calvin & Hobbes strip from Tumblr
+app.get('/api/calvin', async (req, res) => {
+  const apiKey = process.env.TUMBLER_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'TUMBLER_API_KEY not configured' });
+  const offset = Math.floor(Math.random() * 3900);
+  try {
+    const r = await fetch(`https://api.tumblr.com/v2/blog/calvinandhobbes-daily.tumblr.com/posts/photo?type=photo&offset=${offset}&limit=1&api_key=${apiKey}`);
+    if (!r.ok) return res.status(502).json({ error: 'Tumblr API error' });
+    const data = await r.json();
+    const post = data?.response?.posts?.[0];
+    if (!post) return res.status(404).json({ error: 'No post found' });
+    const imageUrl = post.photos?.[0]?.alt_sizes?.[0]?.url || null;
+    const caption = post.summary || 'Calvin and Hobbes';
+    if (!imageUrl) return res.status(404).json({ error: 'No image found' });
+    res.json({ imageUrl, caption });
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to fetch from Tumblr' });
+  }
 });
 
 // POST /api/text

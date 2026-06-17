@@ -1301,4 +1301,123 @@ function initParticles() {
 }
 initParticles();
 
+async function initCalvin() {
+  const strip = document.getElementById('calvin-strip');
+  const img = document.getElementById('calvin-img');
+  const expandBtn = document.getElementById('calvin-expand-btn');
+  if (!strip || !img || !expandBtn) return;
+  let currentCaption = '';
+  try {
+    const res = await fetch('/api/calvin');
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+    if (data.imageUrl) {
+      img.src = data.imageUrl;
+      currentCaption = data.caption || '';
+      strip.classList.remove('hidden');
+      gsap.fromTo(strip, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" });
+    }
+  } catch (e) {
+    const errEl = document.createElement('div');
+    errEl.className = 'calvin-error';
+    errEl.textContent = 'strip of the day failed to load';
+    strip.parentNode.insertBefore(errEl, strip);
+  }
+
+  // Viewer state
+  const viewer = document.getElementById('calvin-viewer');
+  const viewerImg = document.getElementById('cv-img');
+  const dateLabel = document.getElementById('cv-date-label');
+  const body = document.getElementById('cv-body');
+  let zoom = 1;
+  let isPanning = false, panStartX, panStartY, panX = 0, panY = 0;
+
+  expandBtn.addEventListener('click', () => {
+    viewerImg.src = img.src;
+    dateLabel.textContent = currentCaption;
+    zoom = 1; panX = 0; panY = 0;
+    viewerImg.style.transform = 'scale(1) translate(0,0)';
+    viewerImg.style.maxWidth = '100%';
+    viewerImg.style.maxHeight = 'none';
+    body.scrollTop = body.scrollLeft = 0;
+    viewer.classList.remove('hidden');
+    lockBody();
+    gsap.fromTo(viewer, { opacity: 0 }, { opacity: 1, duration: 0.2 });
+  });
+
+  document.querySelector('.calvin-viewer-backdrop').addEventListener('click', closeViewer);
+  document.getElementById('cv-collapse').addEventListener('click', closeViewer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewer.classList.contains('hidden')) closeViewer(); });
+  function closeViewer() {
+    viewer.classList.add('hidden');
+    unlockBody();
+  }
+
+  async function loadNew() {
+    try {
+      const r = await fetch('/api/calvin');
+      const d = await r.json();
+      if (d.imageUrl) {
+        img.src = d.imageUrl;
+        viewerImg.src = d.imageUrl;
+        currentCaption = d.caption || '';
+        dateLabel.textContent = currentCaption;
+        zoom = 1; panX = 0; panY = 0;
+        viewerImg.style.transform = 'scale(1) translate(0,0)';
+        viewerImg.style.maxWidth = '100%';
+        body.scrollTop = body.scrollLeft = 0;
+      }
+    } catch (e) {}
+  }
+
+  document.getElementById('cv-new').addEventListener('click', loadNew);
+
+  document.getElementById('cv-zoom-in').addEventListener('click', () => {
+    zoom = Math.min(zoom + 0.25, 3);
+    viewerImg.style.maxWidth = 'none';
+    viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
+  });
+  document.getElementById('cv-zoom-out').addEventListener('click', () => {
+    zoom = Math.max(zoom - 0.25, 0.25);
+    if (zoom <= 1) { viewerImg.style.maxWidth = '100%'; panX = 0; panY = 0; }
+    viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
+  });
+
+  // Pan on drag when zoomed
+  body.addEventListener('mousedown', (e) => {
+    if (zoom <= 1) return;
+    isPanning = true; body.classList.add('panning');
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!isPanning) return;
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
+  });
+  document.addEventListener('mouseup', () => { isPanning = false; body.classList.remove('panning'); });
+
+  // Touch pan
+  let touchId = null;
+  body.addEventListener('touchstart', (e) => {
+    if (zoom <= 1 || e.touches.length !== 1) return;
+    const t = e.touches[0]; touchId = t.identifier;
+    panStartX = t.clientX - panX;
+    panStartY = t.clientY - panY;
+  }, { passive: true });
+  body.addEventListener('touchmove', (e) => {
+    if (touchId === null) return;
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchId) {
+        panX = t.clientX - panStartX;
+        panY = t.clientY - panStartY;
+        viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
+      }
+    }
+  }, { passive: true });
+  body.addEventListener('touchend', () => { touchId = null; });
+}
+initCalvin().catch(() => {});
+
 setInterval(()=>{ try{ renderItems(); }catch(e){} },30000);

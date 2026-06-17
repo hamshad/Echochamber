@@ -95,7 +95,44 @@
             <a href="https://github.com/hamshad/echochamber" target="_blank" rel="noopener noreferrer">Source</a>
           </span>
         </nav>
+        <div id="calvin-strip" class="calvin-strip hidden">
+          <div class="calvin-strip-inner">
+            <img id="calvin-img" class="calvin-img" src="" alt="Calvin and Hobbes comic strip" loading="lazy" />
+            <button id="calvin-expand-btn" class="calvin-expand-btn" title="Open strip viewer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </button>
+          </div>
+        </div>
       </footer>
+
+      <div id="calvin-viewer" class="calvin-viewer hidden" role="dialog" aria-modal="true" aria-label="Strip viewer">
+        <div class="calvin-viewer-backdrop"></div>
+        <div class="calvin-viewer-panel">
+          <div class="calvin-viewer-header">
+            <span class="calvin-viewer-title">Calvin & Hobbes</span>
+            <span id="cv-date-label" class="cv-date-label"></span>
+            <div class="calvin-viewer-tools">
+              <button class="calvin-viewer-btn" id="cv-new" title="New strip">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+              </button>
+              <span class="calvin-viewer-sep"></span>
+              <button class="calvin-viewer-btn" id="cv-zoom-in" title="Zoom in">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              </button>
+              <button class="calvin-viewer-btn" id="cv-zoom-out" title="Zoom out">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              </button>
+              <span class="calvin-viewer-sep"></span>
+              <button class="calvin-viewer-btn" id="cv-collapse" title="Collapse">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="calvin-viewer-body" id="cv-body">
+            <img id="cv-img" class="calvin-viewer-image" src="" alt="Calvin and Hobbes" />
+          </div>
+        </div>
+      </div>
 
       <div id="drag-overlay" class="drag-overlay hidden" aria-hidden="true">
         <div class="drag-overlay-content">
