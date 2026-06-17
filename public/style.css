@@ -981,7 +981,7 @@ textarea:not(:focus){box-shadow:none}
   position:relative;background:var(--surface);
   border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:0 8px 32px rgba(0,0,0,0.12);
-  max-width:90vw;max-height:90vh;display:flex;flex-direction:column;
+  width:min(95vw,1200px);max-height:95vh;display:flex;flex-direction:column;
 }
 .calvin-viewer-header{
   display:flex;align-items:center;gap:0.5rem;
@@ -1015,7 +1015,7 @@ textarea:not(:focus){box-shadow:none}
 }
 .calvin-viewer-body.panning{cursor:grabbing;}
 .calvin-viewer-image{
-  display:block;max-width:100%;height:auto;transform-origin:0 0;
+  display:block;width:100%;height:auto;transform-origin:0 0;
 }
 
 @media(max-width:640px){

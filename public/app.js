@@ -1336,9 +1336,7 @@ async function initCalvin() {
     viewerImg.src = img.src;
     dateLabel.textContent = currentCaption;
     zoom = 1; panX = 0; panY = 0;
-    viewerImg.style.transform = 'scale(1) translate(0,0)';
-    viewerImg.style.maxWidth = '100%';
-    viewerImg.style.maxHeight = 'none';
+    viewerImg.style.transform = '';
     body.scrollTop = body.scrollLeft = 0;
     viewer.classList.remove('hidden');
     lockBody();
@@ -1363,8 +1361,7 @@ async function initCalvin() {
         currentCaption = d.caption || '';
         dateLabel.textContent = currentCaption;
         zoom = 1; panX = 0; panY = 0;
-        viewerImg.style.transform = 'scale(1) translate(0,0)';
-        viewerImg.style.maxWidth = '100%';
+        viewerImg.style.transform = '';
         body.scrollTop = body.scrollLeft = 0;
       }
     } catch (e) {}
@@ -1374,12 +1371,11 @@ async function initCalvin() {
 
   document.getElementById('cv-zoom-in').addEventListener('click', () => {
     zoom = Math.min(zoom + 0.25, 3);
-    viewerImg.style.maxWidth = 'none';
     viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
   });
   document.getElementById('cv-zoom-out').addEventListener('click', () => {
     zoom = Math.max(zoom - 0.25, 0.25);
-    if (zoom <= 1) { viewerImg.style.maxWidth = '100%'; panX = 0; panY = 0; }
+    if (zoom <= 1) { panX = 0; panY = 0; }
     viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
   });
 
@@ -1398,25 +1394,42 @@ async function initCalvin() {
   });
   document.addEventListener('mouseup', () => { isPanning = false; body.classList.remove('panning'); });
 
-  // Touch pan
-  let touchId = null;
+  // Touch pan + pinch zoom
+  let touchPanId = null, pinchStartDist = 0, pinchStartZoom = 1;
   body.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDist = Math.hypot(dx, dy);
+      pinchStartZoom = zoom;
+      touchPanId = null;
+      return;
+    }
     if (zoom <= 1 || e.touches.length !== 1) return;
-    const t = e.touches[0]; touchId = t.identifier;
+    const t = e.touches[0]; touchPanId = t.identifier;
     panStartX = t.clientX - panX;
     panStartY = t.clientY - panY;
   }, { passive: true });
   body.addEventListener('touchmove', (e) => {
-    if (touchId === null) return;
+    if (e.touches.length === 2 && pinchStartDist > 0) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      zoom = Math.min(Math.max(pinchStartZoom * (dist / pinchStartDist), 0.25), 3);
+      if (zoom <= 1) { panX = 0; panY = 0; }
+      viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
+      return;
+    }
+    if (touchPanId === null) return;
     for (const t of e.changedTouches) {
-      if (t.identifier === touchId) {
+      if (t.identifier === touchPanId) {
         panX = t.clientX - panStartX;
         panY = t.clientY - panStartY;
         viewerImg.style.transform = `scale(${zoom}) translate(${panX}px,${panY}px)`;
       }
     }
   }, { passive: true });
-  body.addEventListener('touchend', () => { touchId = null; });
+  body.addEventListener('touchend', () => { touchPanId = null; pinchStartDist = 0; });
 }
 initCalvin().catch(() => {});
 
