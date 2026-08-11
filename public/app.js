@@ -1,6 +1,4 @@
 // public/app.js — main client script for Echochamber
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
-import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js';
 
 // Scroll lock for dialogs
 function lockBody(){ document.body.classList.add('dialog-open'); }
@@ -158,7 +156,6 @@ function loadQuote() {
 }
 loadQuote();
 
-let db;
 let items = [];
 let myIp = null; // Will be set from server
 let showAll = false;
@@ -190,18 +187,12 @@ function setStatusConnected(connected){
   }
 }
 
-// Fetch our IP from our own server (most reliable way to match roomId)
 async function getMyIp() {
   try {
-    const res = await fetch('/api/items');
-    // The server-side getRoomId is used when we call this endpoint.
-    // We can also just use the response from /api/text, but this is cleaner for init.
-    // However, the /api/items currently returns an array.
-    // Let's add a small health/info endpoint to the server for this.
-    const res2 = await fetch('/api/whoami');
-    if (res2.ok) {
-        const data = await res2.json();
-        return data.ip;
+    const res = await fetch('/api/whoami');
+    if (res.ok) {
+      const data = await res.json();
+      return data.ip;
     }
   } catch (e) {
     console.warn('Could not fetch IP from /api/whoami, falling back to local');
@@ -209,36 +200,30 @@ async function getMyIp() {
   return 'local';
 }
 
-async function initFirebase() {
-  const firebaseConfig = {
-    databaseURL: "https://rnfirebase-c3268-default-rtdb.firebaseio.com",
-    projectId: "rnfirebase-c3268"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-  
-  myIp = await getMyIp();
-  console.log('[App] Detected Room IP:', myIp);
-  
-  const itemsRef = ref(db, 'items');
-  onValue(itemsRef, (snapshot) => {
-    // Hide loading once we get any value from Firebase
+async function fetchItems() {
+  try {
+    const res = await fetch('/api/items');
+    if (!res.ok) throw new Error('Failed to fetch items');
+    const data = await res.json();
     loadingState.classList.add('hidden');
     itemsGrid.classList.remove('hidden');
-    
-    const data = snapshot.val() || {};
-    cachedAllItems = Object.values(data);
-    
+    cachedAllItems = data;
     filterAndRender();
     setStatusConnected(true);
-  }, (error) => {
-    console.error('Firebase DB Error:', error);
+  } catch (err) {
+    console.error('Fetch items error:', err);
     setStatusConnected(false);
-  });
+  }
 }
 
-  initFirebase().catch(err => {
+async function initApp() {
+  myIp = await getMyIp();
+  console.log('[App] Detected Room IP:', myIp);
+  await fetchItems();
+  setInterval(fetchItems, 3000);
+}
+
+initApp().catch(err => {
   console.error('Failed to init app:', err);
   setStatusConnected(false);
 });
@@ -1433,4 +1418,4 @@ async function initCalvin() {
 }
 initCalvin().catch(() => {});
 
-setInterval(()=>{ try{ renderItems(); }catch(e){} },30000);
+setInterval(()=>{ try{ fetchItems(); }catch(e){} },30000);

@@ -117,6 +117,23 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const server = http.createServer(app);
 
+// Origin-based access control — protect all /api/ endpoints except cleanup (cron)
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+if (ALLOWED_ORIGINS.length) {
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/cleanup') return next();
+    const origin = req.headers.origin || '';
+    const referer = req.headers.referer || '';
+    // Allow if Origin matches, Referer matches, or no Origin (same-origin browsers often omit it)
+    const allowed = !origin || ALLOWED_ORIGINS.some(o => origin.startsWith(o) || referer.startsWith(o));
+    if (allowed) return next();
+    return res.status(401).json({ error: 'Unauthorized origin' });
+  });
+  console.log(`[Startup] API access restricted to origins: ${ALLOWED_ORIGINS.join(', ')}`);
+} else {
+  console.warn('[Startup] WARNING: ALLOWED_ORIGINS not set — API endpoints are unprotected');
+}
+
 // API: GET /api/items
 app.get('/api/items', async (req, res) => {
   const roomId = getRoomId(req);
