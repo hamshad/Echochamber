@@ -136,7 +136,8 @@ if (ALLOWED_ORIGINS.length) {
 
 // API: GET /api/items
 app.get('/api/items', async (req, res) => {
-  const roomId = getRoomId(req);
+  const showAll = req.query.all === '1';
+  const roomId = showAll ? null : getRoomId(req);
   res.json(await getActiveItems(roomId));
 });
 

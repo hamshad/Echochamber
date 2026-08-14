@@ -202,7 +202,8 @@ async function getMyIp() {
 
 async function fetchItems() {
   try {
-    const res = await fetch('/api/items');
+    const url = showAll ? '/api/items?all=1' : '/api/items';
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch items');
     const data = await res.json();
     loadingState.classList.add('hidden');
@@ -286,7 +287,7 @@ function toggleShowAll(enable) {
     subtitle.textContent = 'Drop files or paste text \u2014 shared with everyone on your network';
     subtitle.style.color = '';
   }
-  filterAndRender();
+  fetchItems();
 }
 
 function showKeypad() {
