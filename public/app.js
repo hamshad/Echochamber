@@ -162,6 +162,7 @@ let showAll = false;
 let tapCount = 0;
 let tapTimer = null;
 let cachedAllItems = [];
+let optimisticItems = []; // in-flight uploads, kept separate so polling never drops them
 
 const textInput = document.getElementById('text-input');
 const shareTextBtn = document.getElementById('share-text-btn');
@@ -234,8 +235,9 @@ fetch('/api/cleanup').catch(() => {});
 
 function filterAndRender() {
   const now = Date.now();
-  const filtered = cachedAllItems
-    .filter(i => i.expiresAt > now && (showAll || i.roomId === myIp))
+  const all = [...optimisticItems, ...cachedAllItems];
+  const filtered = all
+    .filter(i => i.expiresAt > now && (i.optimistic || showAll || i.roomId === myIp))
     .sort((a, b) => b.createdAt - a.createdAt);
   renderItems(filtered);
 }
@@ -384,60 +386,162 @@ async function shareText(){
   }finally{ shareTextBtn.disabled = false; }
 }
 
+let progressHideTimer = null;
+
 function showProgress(text){
+  clearTimeout(progressHideTimer);
   uploadProgress.classList.remove('hidden');
   progressFill.style.width = '0%';
   progressText.textContent = text;
 }
 
 function hideProgress(){
-  setTimeout(()=>{
+  clearTimeout(progressHideTimer);
+  progressHideTimer = setTimeout(()=>{
     uploadProgress.classList.add('hidden');
     progressFill.style.width = '0%';
   },500);
 }
 
-async function uploadFiles(files){
-  for(const file of files){
-    showProgress(`Uploading ${file.name}...`);
-    const formData = new FormData();
-    formData.append('file', file);
-    const optimisticId = 'optimistic-' + Math.random().toString(36).slice(2,9);
-    items = [{
-      id: optimisticId,
-      type: 'file',
-      originalName: file.name,
+let uploadConfig = null;
+
+async function getUploadConfig(){
+  if (uploadConfig) return uploadConfig;
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) uploadConfig = await res.json();
+  } catch(e){ /* use defaults below */ }
+  uploadConfig = uploadConfig || { chunkSize: 1024*1024, maxFileSize: 100*1024*1024, maxBulkFiles: 20 };
+  return uploadConfig;
+}
+
+async function apiError(res){
+  let detail = '';
+  try { detail = (await res.json()).error || ''; } catch(e){ /* non-JSON response */ }
+  return new Error(detail || `Request failed: ${res.status}`);
+}
+
+function addOptimisticFile(file){
+  const id = 'optimistic-' + Math.random().toString(36).slice(2,9);
+  optimisticItems.push({
+    id, type: 'file',
+    originalName: file.name,
+    size: file.size,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 60*60*1000,
+    optimistic: true,
+    roomId: myIp
+  });
+  filterAndRender();
+  return id;
+}
+
+async function runPool(list, limit, worker){
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      await worker(list[i], i);
+    }
+  }));
+}
+
+// Upload one file as ~1 MB chunks. Returns the final server item.
+async function uploadOneFile(file, onBytes, ctx){
+  const beginRes = await fetch('/api/upload/begin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: file.name,
       size: file.size,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 60*60*1000,
-      optimistic: true,
-      roomId: myIp // Match current room for optimistic UI
-    }, ...items];
-    renderItems();
-    try{
-      await new Promise((resolve,reject)=>{
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/api/upload');
-        xhr.upload.onprogress = (e)=>{
-          if(e.lengthComputable){
-            const pct = Math.round((e.loaded / e.total) * 100);
-            progressFill.style.width = pct + '%';
-            progressText.textContent = `Uploading ${file.name}... ${pct}%`;
-          }
-        };
-        xhr.onload = ()=>{
-          if(xhr.status>=200 && xhr.status<300) {
-              const res = JSON.parse(xhr.responseText);
-              if (!myIp) myIp = res.roomId;
-              resolve();
-          }
-          else reject(new Error(`Upload failed: ${xhr.status}`));
-        };
-        xhr.onerror = ()=>reject(new Error('Upload failed'));
-        xhr.send(formData);
-      });
-      }catch(err){ console.error('Upload error:',err); }
+      mimetype: file.type || 'application/octet-stream'
+    })
+  });
+  if (!beginRes.ok) throw await apiError(beginRes);
+  const begin = await beginRes.json();
+  if (begin.item){ onBytes(file.size); return begin.item; } // empty file
+
+  const { id, chunkSize, totalChunks } = begin;
+  ctx.id = id;
+  const CONCURRENCY = 3;
+  let index = 0;
+  let finalItem = null;
+
+  while (index < totalChunks) {
+    const batch = [];
+    for (let n = 0; n < CONCURRENCY && index < totalChunks; n++) {
+      const i = index++;
+      batch.push((async () => {
+        const blob = file.slice(i * chunkSize, Math.min((i + 1) * chunkSize, file.size));
+        const fd = new FormData();
+        fd.append('id', id);
+        fd.append('index', String(i));
+        fd.append('file', blob, `chunk-${i}`);
+        const res = await fetch('/api/upload/chunk', { method: 'POST', body: fd });
+        if (!res.ok) throw await apiError(res);
+        const data = await res.json();
+        if (data && data.type === 'file' && data.id === id) finalItem = data;
+        onBytes(blob.size);
+      })());
+    }
+    await Promise.all(batch);
   }
+
+  // A lost final response is recovered from the item list.
+  for (let attempt = 0; attempt < 10 && !finalItem; attempt++) {
+    const res = await fetch('/api/items?all=1');
+    if (res.ok) finalItem = (await res.json()).find(i => i.id === id) || null;
+    if (!finalItem) await new Promise(resolve => setTimeout(resolve, 300));
+  }
+  if (!finalItem) throw new Error('Upload did not complete');
+  return finalItem;
+}
+
+async function uploadFiles(files){
+  const list = Array.from(files);
+  if (!list.length) return;
+  const config = await getUploadConfig();
+  if (list.length > config.maxBulkFiles) {
+    alert(`Too many files. Upload at most ${config.maxBulkFiles} at a time.`);
+    return;
+  }
+
+  const totalBytes = list.reduce((sum, f) => sum + f.size, 0) || 1;
+  let doneBytes = 0;
+  const label = `Uploading ${list.length} file${list.length === 1 ? '' : 's'}...`;
+  showProgress(label);
+  let succeeded = 0;
+
+  // Several files in parallel; each file's chunks are also sent in parallel.
+  await runPool(list, 3, async (file) => {
+    const optimisticId = addOptimisticFile(file);
+    const ctx = {};
+    try {
+      const item = await uploadOneFile(file, (bytes) => {
+        doneBytes += bytes;
+        const pct = Math.min(100, Math.round(doneBytes / totalBytes * 100));
+        progressFill.style.width = pct + '%';
+        progressText.textContent = `${label} ${pct}%`;
+      }, ctx);
+
+      // Swap the optimistic card for the real one immediately.
+      optimisticItems = optimisticItems.filter(i => i.id !== optimisticId);
+      if (!myIp) myIp = item.roomId;
+      cachedAllItems = [item, ...cachedAllItems.filter(i => i.id !== item.id)];
+      succeeded++;
+      filterAndRender();
+    } catch(err) {
+      console.error('Upload error:', err);
+      if (ctx.id) fetch(`/api/upload/${ctx.id}`, { method: 'DELETE' }).catch(() => {});
+      optimisticItems = optimisticItems.filter(i => i.id !== optimisticId);
+      filterAndRender();
+    }
+  });
+
+  progressFill.style.width = '100%';
+  progressText.textContent = succeeded === list.length
+    ? `Uploaded ${list.length} file${list.length === 1 ? '' : 's'}`
+    : `Uploaded ${succeeded} of ${list.length} files`;
   hideProgress();
 }
 
@@ -670,6 +774,13 @@ window.copyText = async function(id){
 };
 
 window.deleteItem = async function(id){
+  // In-flight upload: no server record yet, just drop the optimistic card.
+  if (id.startsWith('optimistic-')) {
+    optimisticItems = optimisticItems.filter(i => i.id !== id);
+    filterAndRender();
+    return;
+  }
+
   const card = document.querySelector(`[data-id="${id}"]`);
   if (!card) return;
 
@@ -682,6 +793,9 @@ window.deleteItem = async function(id){
   try {
     const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
+    // Keep local state in sync so the next poll cannot resurrect the card.
+    cachedAllItems = cachedAllItems.filter(i => i.id !== id);
+    items = items.filter(i => i.id !== id);
   } catch (err) {
     console.error('Delete failed:', err);
     alert('Unable to delete item. Please try again.');
