@@ -640,15 +640,11 @@ function syncDom(oldItems, newItems, isInitialLoad) {
   newItems.forEach(item => {
     const existing = oldMap[item.id];
     if (existing) {
-      const isImmortal = item.expiresAt >= 9000000000000000;
-      const timeLeft = getTimeLeft(item.expiresAt);
-      const expiresSoon = !isImmortal && (item.expiresAt - Date.now()) < 10 * 60 * 1000;
-      const footer = existing.querySelector('.item-footer');
-      if (footer) {
-        const timeHtml = isImmortal
-          ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal'
-          : '⏱ ' + timeLeft;
-        footer.innerHTML = `<span class="item-time${isImmortal ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${timeHtml}</span>${item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : ''}`;
+      const isImmortal = isImmortalExpiresAt(item.expiresAt);
+      const meta = existing.querySelector('.item-meta');
+      if (meta) {
+        const charsHtml = item.type === 'text' ? `<span class="item-time">${formatSize(item.size || item.content.length)} chars</span>` : '';
+        meta.innerHTML = renderTimeSpan(item.expiresAt) + charsHtml;
       }
       if (isImmortal) existing.classList.add('immortal');
       else existing.classList.remove('immortal');
@@ -695,8 +691,6 @@ function syncDom(oldItems, newItems, isInitialLoad) {
 }
 
 function renderTextCard(item){
-  const timeLeft = getTimeLeft(item.expiresAt);
-  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   
   // Extract URLs for button generation
   const urls = extractUrls(item.content);
@@ -727,33 +721,27 @@ function renderTextCard(item){
         <div class="item-actions">
           <button class="btn-icon" onclick="copyText('${item.id}')" title="Copy"><svg class="icon-lucide icon-copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
           <button class="btn-icon" onclick="openTextModal('${item.id}')" title="View"><svg class="icon-lucide icon-eye" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><rect class="eyelid" x="0" y="0" width="24" height="24" rx="0" fill="var(--surface)" stroke="none"/></svg></button>
-          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           ${urlButtons}
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="text-content">${escapeHtml(item.content)}</div>
       <div class="item-footer">
-        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal' : '⏱ ' + timeLeft}</span>
-        <span class="item-time">${formatSize(item.size || item.content.length)} chars</span>
+        <div class="item-meta">${renderTimeSpan(item.expiresAt)}<span class="item-time">${formatSize(item.size || item.content.length)} chars</span></div>
+        ${renderTtlControls(item)}
       </div>
     </div>
   `;
 }
 
 function renderFileCard(item){
-  const timeLeft = getTimeLeft(item.expiresAt);
-  const expiresSoon = (item.expiresAt - Date.now()) < 10 * 60 * 1000;
   const optimisticNote = item.optimistic ? '<div class="optimistic">Uploading...</div>' : '';
   return `
     <div class="item-card file${item.expiresAt >= 9000000000000000 ? ' immortal' : ''}" data-id="${item.id}">
       <div class="item-header">
         <span class="item-type file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> File</span>
         <div class="item-actions">
-          <button class="btn-icon extend-btn" onclick="openExtendDialog('${item.id}', this)" title="Extend Time"><svg class="icon-lucide icon-clock" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line class="clock-hand-hour" x1="12" y1="12" x2="12" y2="8" stroke-width="2.5" stroke-linecap="round"/><line class="clock-hand-minute" x1="12" y1="12" x2="12" y2="6" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></button>
           <button class="btn-icon delete" onclick="deleteItem('${item.id}')" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          <button class="btn-icon immortal-btn${item.expiresAt >= 9000000000000000 ? ' active' : ''}"${item.expiresAt >= 9000000000000000 ? '' : ` onclick="immortalItem('${item.id}', this)"`} title="${item.expiresAt >= 9000000000000000 ? 'Immortal' : 'Make Immortal'}"><svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg></button>
         </div>
       </div>
       <div class="file-name">${escapeHtml(item.originalName)}</div>
@@ -761,7 +749,8 @@ function renderFileCard(item){
       <button class="btn-download" onclick="downloadFile('${item.id}','${escapeHtml(item.originalName)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
       ${optimisticNote}
       <div class="item-footer">
-        <span class="item-time${item.expiresAt >= 9000000000000000 ? ' immortal-time' : (expiresSoon ? ' expires-soon' : '')}">${item.expiresAt >= 9000000000000000 ? '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal' : '⏱ ' + timeLeft}</span>
+        <div class="item-meta">${renderTimeSpan(item.expiresAt)}</div>
+        ${renderTtlControls(item)}
       </div>
     </div>
   `;
@@ -891,8 +880,12 @@ window.immortalItem = async function(id, btnEl){
     if (!res.ok) throw new Error('Immortal failed');
     const data = await res.json();
     // Update local state
-    const item = cachedAllItems.find(i => i.id === id);
-    if (item) item.expiresAt = data.expiresAt;
+    for (const arr of [cachedAllItems, items]) {
+      const item = arr.find(i => i.id === id);
+      if (item) item.expiresAt = data.expiresAt;
+    }
+    // Lock +/− immediately; the infinity burst plays over the locked cluster.
+    card.classList.add('ttl-locked');
     // Trigger burst animation
     card.classList.add('immortal-burst');
     // Flash overlay
@@ -940,15 +933,8 @@ window.immortalItem = async function(id, btnEl){
     btnEl.classList.add('active');
     btnEl.removeAttribute('onclick');
     btnEl.title = 'Immortal';
-    // Update footer
-    const footer = card.querySelector('.item-footer');
-    if (footer) {
-      const timeSpan = footer.querySelector('.item-time');
-      if (timeSpan) {
-        timeSpan.className = 'item-time immortal-time';
-        timeSpan.innerHTML = '<svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal';
-      }
-    }
+    // Update the time label without rebuilding the TTL controls
+    updateCardTime(card, data.expiresAt);
     // Add immortal class after burst
     setTimeout(() => { card.classList.add('immortal'); }, 600);
     setTimeout(() => { card.classList.remove('immortal-burst'); }, 1600);
@@ -1124,7 +1110,6 @@ document.addEventListener('keydown', (e)=>{
     if (popup && popup.style.display !== 'none') { closeYouTubePopup(); return; }
     const keypad = document.getElementById('keypad-overlay');
     if (keypad) { keypad.remove(); unlockBody(); return; }
-    if (extendDialogEl) { closeExtendDialog(); return; }
     if (!textModal.classList.contains('hidden')) { closeTextModal(); }
     return;
   }
@@ -1179,205 +1164,123 @@ function getTimeLeft(expiresAt){ const ms = expiresAt - Date.now(); if(ms<=0) re
 
 function formatSize(chars){ return typeof chars === 'number' ? chars.toLocaleString() : chars; }
 
-// --- Extend TTL Time Picker ---
-let extendDialogEl = null;
-let extendItemId = null;
+// --- TTL controls: +1h / -1h / infinity ---
+const IMMORTAL_TTL = 9000000000000000;
+function isImmortalExpiresAt(expiresAt){ return expiresAt >= IMMORTAL_TTL; }
 
-window.openExtendDialog = function(itemId, btnEl) {
-  closeExtendDialog();
-  extendItemId = itemId;
+function renderTimeSpan(expiresAt){
+  if (isImmortalExpiresAt(expiresAt)) {
+    return '<span class="item-time immortal-time"><svg class="icon-infinite-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg> Immortal</span>';
+  }
+  const expiresSoon = (expiresAt - Date.now()) < 10 * 60 * 1000;
+  return `<span class="item-time${expiresSoon ? ' expires-soon' : ''}">⏱ ${getTimeLeft(expiresAt)}</span>`;
+}
 
+function renderTtlControls(item){
+  const infinitySvg = '<svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg>';
+  if (isImmortalExpiresAt(item.expiresAt)) {
+    return `<div class="ttl-controls" title="This item never expires"><span class="btn-icon immortal-btn active" aria-label="Immortal">${infinitySvg}</span></div>`;
+  }
+  return `
+    <div class="ttl-controls">
+      <button class="btn-icon ttl-btn ttl-adjust ttl-minus" onclick="adjustTtl('${item.id}', -1, this)" title="Remove 1 hour" aria-label="Remove 1 hour"><svg class="icon-lucide" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <span class="ttl-divider"></span>
+      <button class="btn-icon ttl-btn ttl-adjust ttl-plus" onclick="adjustTtl('${item.id}', 1, this)" title="Add 1 hour" aria-label="Add 1 hour"><svg class="icon-lucide" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <span class="ttl-divider"></span>
+      <button class="btn-icon ttl-btn immortal-btn" onclick="immortalItem('${item.id}', this)" title="Make Immortal" aria-label="Make immortal">${infinitySvg}</button>
+    </div>`;
+}
+
+function updateCardTime(card, expiresAt){
+  const meta = card && card.querySelector('.item-meta');
+  if (!meta) return;
+  const current = meta.querySelector('.item-time');
+  if (!current) return;
+  const temp = document.createElement('div');
+  temp.innerHTML = renderTimeSpan(expiresAt).trim();
+  current.replaceWith(temp.firstChild);
+}
+
+// Ripple + rising delta label + spark burst. Plus expands, minus contracts.
+function animateTtlAdjust(btn, delta){
+  const isPlus = delta > 0;
+  const color = isPlus ? 'var(--success)' : 'var(--danger)';
+  const svg = btn.querySelector('svg');
+  if (svg) gsap.fromTo(svg,
+    { scale: 0.55, rotate: isPlus ? -90 : 90, opacity: 0.35 },
+    { scale: 1, rotate: 0, opacity: 1, duration: 0.55, ease: 'back.out(3)' });
+
+  const ring = document.createElement('span');
+  ring.className = 'ttl-ripple';
+  ring.style.borderColor = color;
+  btn.appendChild(ring);
+  gsap.fromTo(ring,
+    { scale: isPlus ? 0.35 : 1.75, opacity: 0.9 },
+    { scale: isPlus ? 1.9 : 0.35, opacity: 0, duration: 0.62, ease: 'power2.out',
+      onComplete: () => ring.remove() });
+
+  const label = document.createElement('span');
+  label.className = 'ttl-delta';
+  label.textContent = `${isPlus ? '+' : '−'}${Math.abs(delta)}h`;
+  label.style.color = color;
+  btn.appendChild(label);
+  gsap.fromTo(label,
+    { y: 4, opacity: 0, scale: 0.7, xPercent: -50 },
+    { y: -24, opacity: 1, scale: 1, xPercent: -50, duration: 0.45, ease: 'power2.out',
+      onComplete: () => gsap.to(label, { y: -34, opacity: 0, xPercent: -50, duration: 0.3, onComplete: () => label.remove() }) });
+
+  btn.classList.remove('ttl-charge');
+  void btn.offsetWidth;
+  btn.classList.add('ttl-charge');
+  setTimeout(() => btn.classList.remove('ttl-charge'), 750);
+
+  for (let i = 0; i < 6; i++) {
+    const spark = document.createElement('span');
+    spark.className = 'ttl-spark';
+    spark.style.background = color;
+    spark.style.left = '50%';
+    spark.style.top = '50%';
+    btn.appendChild(spark);
+    const angle = (Math.PI * 2 / 6) * i + Math.random() * 0.4;
+    gsap.fromTo(spark,
+      { x: 0, y: 0, scale: 1, opacity: 0.9 },
+      { x: Math.cos(angle) * 17, y: Math.sin(angle) * 17 - (isPlus ? 7 : -7),
+        scale: 0, opacity: 0, duration: 0.55, ease: 'power2.out',
+        onComplete: () => spark.remove() });
+  }
+}
+
+window.adjustTtl = async function(id, deltaHours, btnEl){
   const card = btnEl.closest('.item-card');
-  const cardRect = card.getBoundingClientRect();
+  if (card && card.classList.contains('ttl-busy')) return;
+  if (card) card.classList.add('ttl-busy');
+  animateTtlAdjust(btnEl, deltaHours);
 
-  const dialog = document.createElement('div');
-  dialog.className = 'extend-dialog';
-  dialog.innerHTML = `
-    <div class="extend-dialog-header">Extend Time</div>
-    <div class="extend-picker">
-      <div class="extend-column" data-type="hours">
-        <div class="extend-column-label">Hours</div>
-        <div class="extend-scroll-wrap">
-          <div class="extend-scroll">
-            <div class="extend-scroll-spacer"></div>
-            ${Array.from({length: 24}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
-            <div class="extend-scroll-spacer"></div>
-          </div>
-        </div>
-      </div>
-      <div class="extend-separator">:</div>
-      <div class="extend-column" data-type="minutes">
-        <div class="extend-column-label">Minutes</div>
-        <div class="extend-scroll-wrap">
-          <div class="extend-scroll">
-            <div class="extend-scroll-spacer"></div>
-            ${Array.from({length: 60}, (_, i) => `<div class="extend-option" data-value="${i}">${String(i).padStart(2,'0')}</div>`).join('')}
-            <div class="extend-scroll-spacer"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="extend-actions">
-      <button class="btn extend-cancel">Cancel</button>
-      <button class="btn btn-primary extend-confirm">Extend</button>
-    </div>
-  `;
-
-  // Position the dialog near the card
-  const top = cardRect.bottom + window.scrollY + 8;
-  let left = cardRect.left + window.scrollX;
-  // Clamp so it doesn't overflow viewport
-  const dialogWidth = 240;
-  if (left + dialogWidth > window.innerWidth - 16) {
-    left = window.innerWidth - dialogWidth - 16;
+  try {
+    const res = await fetch(`/api/items/${id}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hours: deltaHours, minutes: 0 })
+    });
+    if (!res.ok) throw await apiError(res);
+    const data = await res.json();
+    for (const arr of [cachedAllItems, items]) {
+      const item = arr.find(i => i.id === id);
+      if (item) item.expiresAt = data.expiresAt;
+    }
+    updateCardTime(card, data.expiresAt);
+    if (card) {
+      gsap.fromTo(card.querySelector('.item-meta'),
+        { scale: 0.96, opacity: 0.6 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2)' });
+    }
+  } catch (err) {
+    console.error('TTL adjust failed:', err);
+    if (card) gsap.fromTo(card, { x: -4 }, { x: 0, duration: 0.4, ease: 'elastic.out(1, 0.3)' });
+  } finally {
+    if (card) card.classList.remove('ttl-busy');
   }
-  if (left < 8) left = 8;
-  dialog.style.top = top + 'px';
-  dialog.style.left = left + 'px';
-
-  document.body.appendChild(dialog);
-  extendDialogEl = dialog;
-
-  // Setup scroll snapping and mouse drag
-  const scrolls = dialog.querySelectorAll('.extend-scroll');
-  scrolls.forEach(scroll => {
-    // Initial scroll to 0 (first item selected)
-    requestAnimationFrame(() => {
-      scroll.scrollTop = 0;
-      updateSelected(scroll);
-    });
-    scroll.addEventListener('scroll', () => {
-      updateSelected(scroll);
-    }, { passive: true });
-
-    // Mouse drag scrolling
-    let dragging = false;
-    let startY = 0;
-    let startScrollTop = 0;
-
-    scroll.addEventListener('mousedown', (e) => {
-      dragging = true;
-      startY = e.clientY;
-      startScrollTop = scroll.scrollTop;
-      scroll.style.cursor = 'none';
-      scroll.style.scrollSnapType = 'none';
-      e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', mouseDragHandler);
-    document.addEventListener('mouseup', mouseUpHandler);
-
-    function mouseDragHandler(e) {
-      if (!dragging || e.target.closest('.extend-scroll') !== scroll && !scroll.contains(e.target)) return;
-      const delta = startY - e.clientY;
-      scroll.scrollTop = startScrollTop + delta;
-    }
-
-    function mouseUpHandler() {
-      if (!dragging) return;
-      dragging = false;
-      scroll.style.cursor = 'none';
-      scroll.style.scrollSnapType = '';
-      // Re-snap after drag ends
-      snapToNearest(scroll);
-    }
-
-    // Store cleanup refs
-    scroll._cleanupDrag = () => {
-      document.removeEventListener('mousemove', mouseDragHandler);
-      document.removeEventListener('mouseup', mouseUpHandler);
-    };
-  });
-
-  // Cancel button
-  dialog.querySelector('.extend-cancel').addEventListener('click', closeExtendDialog);
-
-  // Confirm button
-  dialog.querySelector('.extend-confirm').addEventListener('click', async () => {
-    const hoursScroll = dialog.querySelector('[data-type="hours"] .extend-scroll');
-    const minsScroll = dialog.querySelector('[data-type="minutes"] .extend-scroll');
-    const hours = getSelectedValue(hoursScroll);
-    const mins = getSelectedValue(minsScroll);
-    if (hours === 0 && mins === 0) return;
-
-    const confirmBtn = dialog.querySelector('.extend-confirm');
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = '...';
-
-    try {
-      const res = await fetch(`/api/items/${extendItemId}/extend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours, minutes: mins })
-      });
-      if (!res.ok) throw new Error('Extend failed');
-      closeExtendDialog();
-    } catch (err) {
-      console.error('Extend failed:', err);
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = 'Extend';
-    }
-  });
-
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', handleOutsideClick);
-  }, 0);
 };
-
-function updateSelected(scroll) {
-  const options = scroll.querySelectorAll('.extend-option');
-  const scrollTop = scroll.scrollTop;
-  const itemHeight = options[0] ? options[0].offsetHeight : 36;
-  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
-  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
-  const selectedIndex = Math.round((scrollTop - spacerHeight + centerOffset) / itemHeight);
-  const clamped = Math.max(0, Math.min(selectedIndex, options.length - 1));
-  options.forEach((opt, i) => {
-    opt.classList.toggle('selected', i === clamped);
-  });
-}
-
-function snapToNearest(scroll) {
-  const options = scroll.querySelectorAll('.extend-option');
-  if (!options.length) return;
-  const itemHeight = options[0].offsetHeight;
-  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
-  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
-  const nearestIndex = Math.round((scroll.scrollTop - spacerHeight + centerOffset) / itemHeight);
-  const clamped = Math.max(0, Math.min(nearestIndex, options.length - 1));
-  const targetScroll = spacerHeight + clamped * itemHeight - centerOffset;
-  scroll.scrollTo({ top: targetScroll, behavior: 'smooth' });
-}
-
-function getSelectedValue(scroll) {
-  const options = scroll.querySelectorAll('.extend-option');
-  const scrollTop = scroll.scrollTop;
-  const itemHeight = options[0] ? options[0].offsetHeight : 36;
-  const spacerHeight = scroll.querySelector('.extend-scroll-spacer').offsetHeight;
-  const centerOffset = scroll.clientHeight / 2 - itemHeight / 2;
-  const idx = Math.round((scrollTop - spacerHeight + centerOffset) / itemHeight);
-  const clamped = Math.max(0, Math.min(idx, options.length - 1));
-  return parseInt(options[clamped]?.dataset.value ?? '0', 10);
-}
-
-function handleOutsideClick(e) {
-  if (extendDialogEl && !extendDialogEl.contains(e.target) && !e.target.closest('.extend-btn')) {
-    closeExtendDialog();
-  }
-}
-
-function closeExtendDialog() {
-  document.removeEventListener('click', handleOutsideClick);
-  if (extendDialogEl) {
-    extendDialogEl.querySelectorAll('.extend-scroll').forEach(s => {
-      if (s._cleanupDrag) s._cleanupDrag();
-    });
-    extendDialogEl.remove();
-    extendDialogEl = null;
-    extendItemId = null;
-  }
-}
 
 function initParticles() {
   const container = document.getElementById('particles-bg');

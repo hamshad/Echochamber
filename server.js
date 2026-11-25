@@ -511,24 +511,29 @@ app.get('/api/download/:id', async (req, res) => {
   }
 });
 
-// POST /api/items/:id/extend
+// POST /api/items/:id/extend — add or remove hours from an item's TTL
+const MIN_TTL_MS = 60 * 1000;
+const IMMORTAL_EXPIRES_AT = 9000000000000000;
 app.post('/api/items/:id/extend', async (req, res) => {
   const id = req.params.id;
   const { hours = 0, minutes = 0 } = req.body || {};
-  const addMs = ((parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0)) * 60 * 1000;
-  if (addMs <= 0) return res.status(400).json({ error: 'Provide hours or minutes greater than 0' });
+  const h = Number(hours), m = Number(minutes);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return res.status(400).json({ error: 'Invalid duration' });
+  const deltaMs = (h * 60 + m) * 60 * 1000;
+  if (deltaMs === 0) return res.status(400).json({ error: 'Provide a non-zero duration' });
   try {
     const snapshot = await itemsRef.child(id).once('value');
     const item = snapshot.val();
     if (!item) return res.status(404).json({ error: 'Not found' });
     if (item.expiresAt <= Date.now()) return res.status(410).json({ error: 'Item already expired' });
+    if (item.expiresAt >= IMMORTAL_EXPIRES_AT) return res.status(400).json({ error: 'Immortal items cannot be adjusted' });
     const roomId = getRoomId(req);
     if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
-    const newExpiresAt = item.expiresAt + addMs;
+    const newExpiresAt = Math.max(Date.now() + MIN_TTL_MS, item.expiresAt + deltaMs);
     await itemsRef.child(id).update({ expiresAt: newExpiresAt });
     return res.json({ success: true, expiresAt: newExpiresAt });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to extend TTL' });
+    return res.status(500).json({ error: 'Failed to adjust TTL' });
   }
 });
 
