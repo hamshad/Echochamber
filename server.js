@@ -511,7 +511,9 @@ app.get('/api/download/:id', async (req, res) => {
   }
 });
 
-// POST /api/items/:id/extend — add or remove hours from an item's TTL
+// POST /api/items/:id/extend — add or remove hours from an item's TTL.
+// TTL never goes below 1 minute so a card can't linger at 0; the client is told
+// about the clamp so it can show an explicit "min 1m" hint.
 const MIN_TTL_MS = 60 * 1000;
 const IMMORTAL_EXPIRES_AT = 9000000000000000;
 app.post('/api/items/:id/extend', async (req, res) => {
@@ -529,9 +531,12 @@ app.post('/api/items/:id/extend', async (req, res) => {
     if (item.expiresAt >= IMMORTAL_EXPIRES_AT) return res.status(400).json({ error: 'Immortal items cannot be adjusted' });
     const roomId = getRoomId(req);
     if (item.roomId !== roomId) return res.status(403).json({ error: 'Forbidden' });
-    const newExpiresAt = Math.max(Date.now() + MIN_TTL_MS, item.expiresAt + deltaMs);
+
+    const requested = item.expiresAt + deltaMs;
+    const floor = Date.now() + MIN_TTL_MS;
+    const newExpiresAt = Math.max(floor, requested);
     await itemsRef.child(id).update({ expiresAt: newExpiresAt });
-    return res.json({ success: true, expiresAt: newExpiresAt });
+    return res.json({ success: true, expiresAt: newExpiresAt, clamped: newExpiresAt > requested });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to adjust TTL' });
   }

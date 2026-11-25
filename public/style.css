@@ -401,6 +401,13 @@ body.dialog-open .item-card{
   animation:ttlSweep 0.7s linear forwards;pointer-events:none;
 }
 @keyframes ttlSweep{from{transform:rotate(0deg);opacity:0.9}to{transform:rotate(360deg);opacity:0}}
+.ttl-controls.ttl-floor{animation:ttlFloorPulse 0.9s ease-out}
+@keyframes ttlFloorPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(196,148,10,0)}
+  25%{box-shadow:0 0 0 3px color-mix(in srgb,var(--warning) 35%,transparent)}
+  60%{box-shadow:0 0 0 6px transparent}
+}
+.ttl-hint{font-size:0.6rem;font-weight:600;letter-spacing:0.01em}
 .expires-soon{color:var(--danger);animation:expiresPulse 1.5s ease-in-out infinite}
 @keyframes expiresPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 

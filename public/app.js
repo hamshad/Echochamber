@@ -1177,6 +1177,7 @@ function renderTimeSpan(expiresAt){
 }
 
 function renderTtlControls(item){
+  if (item.optimistic) return ''; // no TTL controls until the upload finishes
   const infinitySvg = '<svg class="icon-lucide icon-infinity" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="infinity-path" d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/></svg>';
   if (isImmortalExpiresAt(item.expiresAt)) {
     return `<div class="ttl-controls" title="This item never expires"><span class="btn-icon immortal-btn active" aria-label="Immortal">${infinitySvg}</span></div>`;
@@ -1250,6 +1251,19 @@ function animateTtlAdjust(btn, delta){
   }
 }
 
+function showTtlHint(btn, text){
+  const label = document.createElement('span');
+  label.className = 'ttl-delta ttl-hint';
+  label.textContent = text;
+  label.style.color = 'var(--warning)';
+  btn.appendChild(label);
+  gsap.fromTo(label,
+    { y: 2, opacity: 0, scale: 0.8, xPercent: -50 },
+    { y: -26, opacity: 1, scale: 1, xPercent: -50, duration: 0.4, ease: 'power2.out',
+      onComplete: () => gsap.to(label, { y: -36, opacity: 0, xPercent: -50, delay: 0.35,
+        duration: 0.4, onComplete: () => label.remove() }) });
+}
+
 window.adjustTtl = async function(id, deltaHours, btnEl){
   const card = btnEl.closest('.item-card');
   if (card && card.classList.contains('ttl-busy')) return;
@@ -1273,6 +1287,16 @@ window.adjustTtl = async function(id, deltaHours, btnEl){
       gsap.fromTo(card.querySelector('.item-meta'),
         { scale: 0.96, opacity: 0.6 },
         { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2)' });
+    }
+    if (data.clamped) {
+      showTtlHint(btnEl, 'min 1m');
+      const cluster = btnEl.closest('.ttl-controls');
+      if (cluster) {
+        cluster.classList.remove('ttl-floor');
+        void cluster.offsetWidth;
+        cluster.classList.add('ttl-floor');
+        setTimeout(() => cluster.classList.remove('ttl-floor'), 900);
+      }
     }
   } catch (err) {
     console.error('TTL adjust failed:', err);
